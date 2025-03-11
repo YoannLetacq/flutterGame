@@ -9,8 +9,9 @@ class GameRepository implements IGameRepository {
 
   @override
   Future<void> createGame(Map<String, dynamic> gameData) async {
-    // On suppose que les parties sont stockées dans la collection 'games'.
-    await _firestore.collection('games').add(gameData);
+    // Utilisation de l'ID fourni dans gameData pour créer le document.
+    final String gameId = gameData['id'] as String;
+    await _firestore.collection('games').doc(gameId).set(gameData);
   }
 
   @override
