@@ -20,14 +20,15 @@ class Zone01GameApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      // Pour tester en conditions réelles, l'initialRoute est définie sur MatchmakingScreen.
-      initialRoute: MatchmakingScreen.routeName,
+      // Pour simuler l'abandon, nous définissons AbandonScreen comme route initiale.
+      initialRoute: AbandonScreen.routeName,
       routes: {
         HomeScreen.routeName: (context) => const HomeScreen(),
         LoginScreen.routeName: (context) => const LoginScreen(),
         MatchmakingScreen.routeName: (context) => const MatchmakingScreen(),
         GameScreen.routeName: (context) => const GameScreen(),
         ResultScreen.routeName: (context) => const ResultScreen(),
+        AbandonScreen.routeName: (context) => const AbandonScreen(),
       },
     );
   }
