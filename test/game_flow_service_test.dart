@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:untitled/models/game_model.dart';
 import 'package:untitled/services/timer_service.dart';
 import 'package:untitled/services/game_progress_service.dart';
@@ -23,8 +22,8 @@ void main() {
       eloService = EloService();
       game = GameModel(
         id: 'gameFlow1',
-        cards: ['card1', 'card2', 'card3'],
-        mode: GameMode.CLASSIQUE, // ou CLASSEE selon le contexte
+        cards: ['card1', 'card2', 'card3', 'card4', 'card5'],
+        mode: GameMode.CLASSEE, // ou CLASSIQUE selon le contexte
         players: {},
       );
       gameFlowService = GameFlowService(
@@ -42,9 +41,13 @@ void main() {
       expect(gameFlowService.currentCardIndex, equals(1));
       gameFlowService.nextCard();
       expect(gameFlowService.currentCardIndex, equals(2));
-      // À la fin, nextCard ne doit pas dépasser le dernier index.
       gameFlowService.nextCard();
-      expect(gameFlowService.currentCardIndex, equals(2));
+      gameFlowService.nextCard();
+      // Avec 5 cartes, le dernier index est 4.
+      expect(gameFlowService.currentCardIndex, equals(4));
+      // Un appel supplémentaire ne doit pas dépasser.
+      gameFlowService.nextCard();
+      expect(gameFlowService.currentCardIndex, equals(4));
     });
 
     test('Calculate ranking change', () {
@@ -55,6 +58,63 @@ void main() {
         kFactor: 60,
       );
       expect(delta, closeTo(30.0, 0.1));
+    });
+
+    test('End game stops timer and sets isGameEnded', () {
+      // Démarrer le chronomètre pour vérifier qu'il est actif
+      gameFlowService.startGame(
+        onTick: (_) {},
+        onSpeedUp: () {},
+      );
+      gameFlowService.endGame();
+      expect(gameFlowService.isGameEnded, isTrue);
+    });
+
+    // tests pour checkAbandon
+    test('checkAbandon returns none when conditions are normal', () {
+      final now = DateTime.now();
+      final result = gameFlowService.checkAbandon(
+        lastActive: now,
+        lastConnected: now,
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
+      );
+      expect(result, equals(AbandonType.none));
+    });
+
+    test('checkAbandon returns modal when modalConfirmed is true', () {
+      final now = DateTime.now();
+      final result = gameFlowService.checkAbandon(
+        lastActive: now,
+        lastConnected: now,
+        modalConfirmed: true,
+        timeout: const Duration(minutes: 1),
+      );
+      expect(result, equals(AbandonType.modal));
+    });
+
+    test('checkAbandon returns inactive when lastActive is too old', () {
+      final now = DateTime.now();
+      final lastActive = now.subtract(const Duration(minutes: 2)); // inactivité dépassée
+      final result = gameFlowService.checkAbandon(
+        lastActive: lastActive,
+        lastConnected: now, // connexion récente
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
+      );
+      expect(result, equals(AbandonType.inactive));
+    });
+
+    test('checkAbandon returns disconnect when lastConnected is too old', () {
+      final now = DateTime.now();
+      final lastConnected = now.subtract(const Duration(minutes: 2)); // déconnexion dépassée
+      final result = gameFlowService.checkAbandon(
+        lastActive: now, // activité récente
+        lastConnected: lastConnected,
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
+      );
+      expect(result, equals(AbandonType.disconnect));
     });
   });
 }
