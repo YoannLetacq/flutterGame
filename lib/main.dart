@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:untitled/ui/home_screen.dart';
 import 'package:untitled/ui/login_screen.dart';
+import 'package:untitled/ui/matchmaking_screen.dart';
+import 'package:untitled/ui/game_screen.dart';
+import 'package:untitled/ui/result_screen.dart';
+import 'package:untitled/ui/abandon_screen.dart';
 
 void main() {
   runApp(const Zone01GameApp());
@@ -16,11 +20,14 @@ class Zone01GameApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      initialRoute: HomeScreen.routeName,
+      // Pour tester en conditions réelles, l'initialRoute est définie sur MatchmakingScreen.
+      initialRoute: MatchmakingScreen.routeName,
       routes: {
         HomeScreen.routeName: (context) => const HomeScreen(),
         LoginScreen.routeName: (context) => const LoginScreen(),
-        // Les autres écrans (Matchmaking, Jeu, Résultats, Abandon) seront ajoutés par la suite.
+        MatchmakingScreen.routeName: (context) => const MatchmakingScreen(),
+        GameScreen.routeName: (context) => const GameScreen(),
+
       },
     );
   }
