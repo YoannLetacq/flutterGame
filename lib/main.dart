@@ -27,7 +27,7 @@ class Zone01GameApp extends StatelessWidget {
         LoginScreen.routeName: (context) => const LoginScreen(),
         MatchmakingScreen.routeName: (context) => const MatchmakingScreen(),
         GameScreen.routeName: (context) => const GameScreen(),
-
+        ResultScreen.routeName: (context) => const ResultScreen(),
       },
     );
   }
