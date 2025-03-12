@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:untitled/ui/home_screen.dart';
 import 'package:untitled/ui/login_screen.dart';
 import 'package:untitled/ui/matchmaking_screen.dart';
@@ -6,7 +7,15 @@ import 'package:untitled/ui/game_screen.dart';
 import 'package:untitled/ui/result_screen.dart';
 import 'package:untitled/ui/abandon_screen.dart';
 
-void main() {
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  // Assurez-vous que le binding est initialisé avant toute opération asynchrone.
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialiser Firebase avec la configuration réelle (firebase_options.dart ou via google-services.json).
+    await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+    );
   runApp(const Zone01GameApp());
 }
 
@@ -20,8 +29,8 @@ class Zone01GameApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      // Pour simuler l'abandon, nous définissons AbandonScreen comme route initiale.
-      initialRoute: AbandonScreen.routeName,
+      // Pour tester en situation réelle avec la DB, définissez l'écran de démarrage souhaité.
+      initialRoute: HomeScreen.routeName,
       routes: {
         HomeScreen.routeName: (context) => const HomeScreen(),
         LoginScreen.routeName: (context) => const LoginScreen(),
