@@ -1,9 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   static const routeName = '/login';
 
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final UserCredential? userCredential = await _authService.signInWithGoogle();
+      if (!mounted) return;
+      if (userCredential != null) {
+        Navigator.pushReplacementNamed(context, '/matchmaking');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connexion annulée')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur lors de la connexion')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,33 +52,19 @@ class LoginScreen extends StatelessWidget {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
+          child: _isLoading
+              ? const CircularProgressIndicator()
+              : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               const Text(
-                'Veuillez vous connecter',
+                'Connectez-vous avec Google',
                 style: TextStyle(fontSize: 20),
               ),
               const SizedBox(height: 20),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                ),
-              ),
-              const SizedBox(height: 10),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
-                  // La logique de connexion sera ajoutée ultérieurement.
-                  Navigator.pushNamed(context, '/matchmaking');
-                },
-                child: const Text('Se connecter'),
+                onPressed: _handleGoogleSignIn,
+                child: const Text('Se connecter avec Google'),
               ),
             ],
           ),
