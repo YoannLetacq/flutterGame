@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final UserCredential? userCredential = await _authService.signInWithGoogle();
       if (!mounted) return;
       if (userCredential != null) {
-        Navigator.pushReplacementNamed(context, '/matchmaking');
+        Navigator.pushReplacementNamed(context, '/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Connexion annulée')),
