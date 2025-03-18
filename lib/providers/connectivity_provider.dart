@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:untitled/services/connectivity_service.dart';
-
+/// Provides the connectivity results to the app.
+///
+/// This provider listens to the [ConnectivityService] and updates the connectivity results.
 class ConnectivityProvider with ChangeNotifier {
   final ConnectivityService _connectivityService = ConnectivityService();
   List<ConnectivityResult> _connectivityResults = [];
