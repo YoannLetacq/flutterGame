@@ -23,15 +23,21 @@ class CardModel {
 
   factory CardModel.fromJson(Map<String, dynamic> json) {
     return CardModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      type: json['type'] as String,
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
       definition: json['definition'] as String? ?? '',
-      options: List<String>.from(json['options'] ?? []),
-      hints: List<String>.from(json['hints'] ?? []),
       answer: json['answer'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String? ?? '',
       explanation: json['explanation'] as String? ?? '',
+      hints: (json['hints'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+          [],
+      imageUrl: json['imageUrl'] as String? ?? '',
+      options: (json['options'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+          [],
+      type: json['type'] as String? ?? '',
     );
   }
 
