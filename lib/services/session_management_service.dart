@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
-
+/// Service de gestion des sessions utilisateur.
+/// [initializeSession] initialise une nouvelle session pour l'utilisateur connecté.
+/// [endSession] supprime la session de l'utilisateur lors de la déconnexion.
 class SessionManagementService {
   final FirebaseAuth _firebaseAuth;
   final DatabaseReference _dbReference;
