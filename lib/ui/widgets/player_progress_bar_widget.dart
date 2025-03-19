@@ -18,20 +18,37 @@ class PlayerProgressBarWidget extends StatelessWidget {
         CircleAvatar(
           backgroundImage: avatarUrl.startsWith('http')
               ? NetworkImage(avatarUrl)
-              : AssetImage(avatarUrl),
-          radius: 20,
+              : AssetImage(avatarUrl) as ImageProvider,
+          radius: 24,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         Expanded(
           child: TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: 0, end: progress),
             duration: const Duration(milliseconds: 500),
             builder: (context, value, child) {
-              return LinearProgressIndicator(
-                value: value,
-                minHeight: 10,
-                backgroundColor: Colors.grey[300],
-                color: Theme.of(context).primaryColor,
+              return Container(
+                height: 20,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  // Gradient du rose vers le bleu, intensité croissante
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(
+                        Colors.pinkAccent.withOpacity(0.5),
+                        Colors.blueAccent,
+                        value,
+                      )!,
+                      Color.lerp(
+                        Colors.pinkAccent.withOpacity(0.2),
+                        Colors.blue,
+                        value,
+                      )!,
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
               );
             },
           ),
