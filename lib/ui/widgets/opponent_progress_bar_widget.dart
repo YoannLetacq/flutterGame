@@ -31,7 +31,9 @@ class OpponentProgressBarWidget extends StatelessWidget {
         const SizedBox(width: 8),
         // Avatar à droite
         CircleAvatar(
-          backgroundImage: NetworkImage(avatarUrl),
+          backgroundImage: avatarUrl.startsWith('http')
+              ? NetworkImage(avatarUrl)
+              : AssetImage(avatarUrl),
           radius: 20,
         ),
       ],
