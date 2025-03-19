@@ -5,6 +5,72 @@ import 'package:untitled/services/game_progress_service.dart';
 import 'package:untitled/services/abandon_service.dart';
 import 'package:untitled/services/elo_service.dart';
 import 'package:untitled/services/game_flow_service.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+/// Implémentation factice minimale de FirebaseDatabase pour les tests.
+class FakeFirebaseDatabase implements FirebaseDatabase {
+  final FakeDatabaseReference _root = FakeDatabaseReference();
+  @override
+  DatabaseReference ref([String? path]) => _root.child(path ?? '');
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FakeDatabaseReference implements DatabaseReference {
+  Map<String, dynamic> data = {};
+
+  @override
+  Future<void> set(dynamic value) async {
+    data = value as Map<String, dynamic>;
+  }
+
+  @override
+  Future<void> update(dynamic value) async {
+    data.addAll(value as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> remove() async {
+    data.clear();
+  }
+
+  @override
+  DatabaseReference child(String path) {
+    // Pour simuler la hiérarchie, on retourne une nouvelle instance qui partage le même Map.
+    return FakeDatabaseReference()..data = data;
+  }
+
+  @override
+  Stream<DatabaseEvent> get onValue async* {
+    yield FakeDatabaseEvent(data);
+  }
+
+  @override
+  Future<DatabaseEvent> once([DatabaseEventType eventType = DatabaseEventType.value]) async {
+    return FakeDatabaseEvent(data);
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FakeDatabaseEvent implements DatabaseEvent {
+  final Map<String, dynamic> data;
+  FakeDatabaseEvent(this.data);
+  @override
+  DataSnapshot get snapshot => FakeDataSnapshot(data);
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FakeDataSnapshot implements DataSnapshot {
+  final dynamic _value;
+  FakeDataSnapshot(this._value);
+  @override
+  dynamic get value => _value;
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   group('GameFlowService Tests', () {
@@ -13,6 +79,8 @@ void main() {
     late AbandonService abandonService;
     late EloService eloService;
     late GameModel game;
+    late FakeFirebaseDatabase fakeDatabase;
+    late DatabaseReference gameRef;
     late GameFlowService gameFlowService;
 
     setUp(() {
@@ -23,30 +91,31 @@ void main() {
       game = GameModel(
         id: 'gameFlow1',
         cards: ['card1', 'card2', 'card3', 'card4', 'card5'],
-        mode: GameMode.CLASSEE, // ou CLASSIQUE selon le contexte
+        mode: GameMode.CLASSIQUE,
         players: {},
       );
+      fakeDatabase = FakeFirebaseDatabase();
+      gameRef = fakeDatabase.ref('games/gameFlow1');
       gameFlowService = GameFlowService(
         timerService: timerService,
         progressService: progressService,
         abandonService: abandonService,
         eloService: eloService,
         game: game,
+        gameRef: gameRef,
       );
     });
 
-    test('Progression through cards', () {
+    test('Progression through cards', () async {
       expect(gameFlowService.currentCardIndex, equals(0));
-      gameFlowService.nextCard();
+      await gameFlowService.nextCard('player1');
       expect(gameFlowService.currentCardIndex, equals(1));
-      gameFlowService.nextCard();
+      await gameFlowService.nextCard('player1');
       expect(gameFlowService.currentCardIndex, equals(2));
-      gameFlowService.nextCard();
-      gameFlowService.nextCard();
-      // Avec 5 cartes, le dernier index est 4.
+      await gameFlowService.nextCard('player1');
+      await gameFlowService.nextCard('player1');
       expect(gameFlowService.currentCardIndex, equals(4));
-      // Un appel supplémentaire ne doit pas dépasser.
-      gameFlowService.nextCard();
+      await gameFlowService.nextCard('player1');
       expect(gameFlowService.currentCardIndex, equals(4));
     });
 
@@ -60,17 +129,20 @@ void main() {
       expect(delta, closeTo(30.0, 0.1));
     });
 
-    test('End game stops timer and sets isGameEnded', () {
-      // Démarrer le chronomètre pour vérifier qu'il est actif
+    test('End game stops timer and updates player status to finished', () async {
       gameFlowService.startGame(
         onTick: (_) {},
         onSpeedUp: () {},
+        playerId: 'player1',
       );
-      gameFlowService.endGame();
+      await gameFlowService.endGame('player1');
       expect(gameFlowService.isGameEnded, isTrue);
+      final event = await gameRef.child('players').child('player1').once();
+      final Map data = event.snapshot.value as Map;
+      expect(data['status'], equals('finished'));
     });
 
-    // tests pour checkAbandon
+    // Tests pour checkAbandon
     test('checkAbandon returns none when conditions are normal', () {
       final now = DateTime.now();
       final result = gameFlowService.checkAbandon(
@@ -95,10 +167,10 @@ void main() {
 
     test('checkAbandon returns inactive when lastActive is too old', () {
       final now = DateTime.now();
-      final lastActive = now.subtract(const Duration(minutes: 2)); // inactivité dépassée
+      final lastActive = now.subtract(const Duration(minutes: 2));
       final result = gameFlowService.checkAbandon(
         lastActive: lastActive,
-        lastConnected: now, // connexion récente
+        lastConnected: now,
         modalConfirmed: false,
         timeout: const Duration(minutes: 1),
       );
@@ -107,9 +179,9 @@ void main() {
 
     test('checkAbandon returns disconnect when lastConnected is too old', () {
       final now = DateTime.now();
-      final lastConnected = now.subtract(const Duration(minutes: 2)); // déconnexion dépassée
+      final lastConnected = now.subtract(const Duration(minutes: 2));
       final result = gameFlowService.checkAbandon(
-        lastActive: now, // activité récente
+        lastActive: now,
         lastConnected: lastConnected,
         modalConfirmed: false,
         timeout: const Duration(minutes: 1),
