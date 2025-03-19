@@ -38,4 +38,18 @@ class CardModel {
       type: json['type'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'definition': definition,
+      'answer': answer,
+      'explanation': explanation,
+      'hints': hints,
+      'imageUrl': imageUrl,
+      'options': options,
+      'type': type,
+    };
+  }
 }
