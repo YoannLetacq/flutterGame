@@ -18,7 +18,6 @@ class GameFlowService {
 
   int currentCardIndex = 0;
   bool isGameEnded = false;
-  Timer? _gameTimer;
 
   GameFlowService({
     required this.timerService,
@@ -42,7 +41,13 @@ class GameFlowService {
       if (kDebugMode) {
         print('Chronomètre démarré.');
       }
-      // Initialiser l'état du joueur dans la partie.
+
+      // Enregistrer le temps de démarrage et le mode speed-up initial.
+      gameRef.update({
+        'startTime': DateTime.now().millisecondsSinceEpoch,
+        'modeSpeedUp': false,
+      });
+
       updatePlayerState(playerId);
     } catch (e, stackTrace) {
       if (kDebugMode) {
