@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:untitled/models/card_model.dart';
+import 'package:untitled/services/card_service.dart';
 import 'package:untitled/services/response_service.dart';
 import 'package:untitled/ui/widgets/card_response_widget.dart';
 
@@ -12,43 +13,62 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  // Simuler une carte courante pour l'exemple.
-  // Dans une implémentation réelle, cette carte serait chargée via CardService.
-  CardModel? currentCard;
-  final ResponseService responseService = ResponseService();
+  final CardService _cardService = CardService();
+  final ResponseService _responseService = ResponseService();
+  List<CardModel> cards = [];
+  int currentIndex = 0;
+  bool isLoading = true;
   int score = 0;
+
+  CardModel? get currentCard => (cards.isNotEmpty && currentIndex < cards.length)
+      ? cards[currentIndex]
+      : null;
 
   @override
   void initState() {
     super.initState();
-    // Exemple de carte pour tester les deux types.
-    // Pour tester le TextField, changez 'type' en "complement".
-    currentCard = CardModel(
-      id: 'card1',
-      name: 'Exemple de Carte',
-      definition:
-      'Complétez la phrase : Flutter est un framework pour...',
-      answer: 'Flutter est un framework pour développer des applications multiplateformes.',
-      explanation: 'Explication de la réponse.',
-      hints: ['framework', 'multiplateforme', 'applications'],
-      imageUrl: '',
-      options: ['Option A', 'Option B', 'ma réponse', 'Option D'],
-      type: 'definition', // ou 'complement'
-    );
+    _loadCards();
+  }
+
+  Future<void> _loadCards() async {
+    try {
+      final fetchedCards = await _cardService.fetchCards();
+      if (mounted) {
+        setState(() {
+          cards = fetchedCards;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+      // Vous pouvez afficher un message d'erreur ici si besoin.
+    }
   }
 
   void _handleResponse(String userResponse) {
     if (currentCard == null) return;
-    bool isCorrect = responseService.evaluateResponse(
-      userResponse,
-      currentCard!.answer,
+    bool isCorrect = _responseService.evaluateResponse(userResponse, currentCard!.answer);
+    String message = isCorrect ? "Bonne réponse !" : "Mauvaise réponse";
+    if (isCorrect) {
+      setState(() {
+        score += 10; // Exemple : 10 points pour une bonne réponse.
+      });
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
-    setState(() {
-      if (isCorrect) {
-        score += 10; // Exemple : 10 points par bonne réponse.
+
+    // Passer à la carte suivante après un délai pour permettre à l'utilisateur de voir le message
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          currentIndex++;
+        });
       }
-      // Ici, vous pouvez ajouter la logique pour passer à la carte suivante.
-      // Pour cet exemple, nous ne mettons pas à jour currentCard.
     });
   }
 
@@ -56,30 +76,51 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Game Screen')),
-      body: currentCard == null
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : currentCard == null
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Fin des cartes !',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Score final : $score',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            // Ici, vous pouvez ajouter une navigation vers l'écran des résultats.
+          ],
+        ),
+      )
           : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Affichage de la question ou de la définition de la carte.
+            // Affichage de la carte
             Text(
               currentCard!.definition,
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            // Intégration du widget de réponse qui s'adapte au type de la carte.
+            // Affichage du widget de réponse qui s'adapte au type de carte.
             CardResponseWidget(
               cardType: currentCard!.type,
               options: currentCard!.type == 'definition'
                   ? currentCard!.options
                   : null,
               onSubmit: _handleResponse,
+              questionText: currentCard!.type == 'definition'
+                  ? currentCard!.definition
+                  : currentCard!.name,
             ),
             const SizedBox(height: 24),
-            // Affichage du score.
+            // Affichage du score en cours.
             Text(
               'Score: $score',
               style: Theme.of(context).textTheme.headlineSmall,
