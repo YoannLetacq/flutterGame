@@ -16,7 +16,9 @@ class PlayerProgressBarWidget extends StatelessWidget {
       children: [
         // Avatar à gauche
         CircleAvatar(
-          backgroundImage: NetworkImage(avatarUrl),
+          backgroundImage: avatarUrl.startsWith('http')
+              ? NetworkImage(avatarUrl)
+              : AssetImage(avatarUrl),
           radius: 20,
         ),
         const SizedBox(width: 8),
