@@ -36,7 +36,7 @@ class FakeDatabaseReference implements DatabaseReference {
 
   @override
   DatabaseReference child(String path) {
-    // Pour simuler la hiérarchie, on retourne une nouvelle instance qui partage le même Map.
+    // Pour simuler une hiérarchie, on retourne une nouvelle instance partageant le même Map.
     return FakeDatabaseReference()..data = data;
   }
 
@@ -95,6 +95,7 @@ void main() {
         players: {},
       );
       fakeDatabase = FakeFirebaseDatabase();
+      // Simuler la référence de la partie sous "games/gameFlow1"
       gameRef = fakeDatabase.ref('games/gameFlow1');
       gameFlowService = GameFlowService(
         timerService: timerService,
@@ -114,6 +115,7 @@ void main() {
       expect(gameFlowService.currentCardIndex, equals(2));
       await gameFlowService.nextCard('player1');
       await gameFlowService.nextCard('player1');
+      // Avec 5 cartes, le dernier index est 4.
       expect(gameFlowService.currentCardIndex, equals(4));
       await gameFlowService.nextCard('player1');
       expect(gameFlowService.currentCardIndex, equals(4));
