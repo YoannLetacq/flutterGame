@@ -1,11 +1,23 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled/models/card_model.dart';
 import 'package:untitled/services/card_service.dart';
+import 'package:untitled/services/game_flow_service.dart';
 import 'package:untitled/services/response_service.dart';
 import 'package:untitled/ui/widgets/animated_card_display.dart';
 import 'package:untitled/ui/widgets/card_response_widget.dart';
 import 'package:untitled/ui/widgets/player_progress_bar_widget.dart';
 import 'package:untitled/ui/widgets/opponent_progress_bar_widget.dart';
+
+import '../models/game_model.dart';
+import '../models/player_model.dart';
+import '../services/abandon_service.dart';
+import '../services/elo_service.dart';
+import '../services/game_progress_service.dart';
+import '../services/timer_service.dart';
+
 
 class GameScreen extends StatefulWidget {
   static const routeName = '/game';
@@ -18,6 +30,8 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   final CardService _cardService = CardService();
   final ResponseService _responseService = ResponseService();
+  late GameFlowService gameFlowService;
+
   List<CardModel> cards = [];
   int currentIndex = 0;
   bool isLoading = true;
@@ -33,9 +47,88 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCards();
+
+    // Récupérer l'utilisateur connecté via FirebaseAuth.
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+      return;
+    }
+
+    // Charger les cartes depuis Firestore via _loadCards().
+    _loadCards().then((_) {
+      // Une fois les cartes chargées, générer un identifiant unique pour la partie.
+      final String gameId = FirebaseDatabase.instance.ref().child('games').push().key!;
+
+      // Créer une instance de PlayerModel pour le joueur local.
+      final player = PlayerModel(
+        id: currentUser.uid,
+        cardsOrder: [], // Cette liste sera remplie ultérieurement par la logique de répartition.
+        currentCardIndex: 0,
+        score: 0,
+        status: 'in game',
+        winner: null,
+      );
+
+      // Construire le GameModel en utilisant l'ID généré, la liste des IDs de cartes et les données du joueur.
+      final GameModel gameModel = GameModel(
+        id: gameId,
+        cards: cards.map((card) => card.id).toList(),
+        mode: GameMode.CLASSIQUE, // On utilise le mode classique pour le moment.
+        players: { currentUser.uid: player },
+      );
+
+      // Créer la référence de la partie dans Firebase Realtime Database sous "games/{gameId}".
+      final DatabaseReference gameRef =
+      FirebaseDatabase.instance.ref().child('games').child(gameId);
+
+      // Initialiser GameFlowService avec TimerService, GameProgressService, AbandonService, EloService, le modèle et la référence.
+      gameFlowService = GameFlowService(
+        timerService: TimerService(),
+        progressService: GameProgressService(),
+        abandonService: AbandonService(),
+        eloService: EloService(),
+        game: gameModel,
+        gameRef: gameRef,
+      );
+
+      // Démarrer le match : démarrez le timer et enregistrez l'état initial du joueur dans la DB.
+      gameFlowService.startGame(
+        onTick: (elapsedSeconds) {
+          if (kDebugMode) {
+            print("Temps écoulé : $elapsedSeconds secondes");
+          }
+        },
+        onSpeedUp: () {
+          if (kDebugMode) {
+            print("Mode speed-up activé !");
+          }
+        },
+        playerId: currentUser.uid,
+      );
+
+      // Mettre en place un listener pour synchroniser la progression de l'adversaire.
+      gameFlowService.listenGameState().listen((DatabaseEvent event) {
+        final data = event.snapshot.value as Map?;
+        if (data != null && data.containsKey('players')) {
+          final playersData = data['players'] as Map;
+          // Supposons que l'adversaire ait l'ID 'player2'
+          if (playersData.containsKey('player2')) {
+            final opponentData = playersData['player2'] as Map;
+            int opponentIndex = opponentData['currentCardIndex'] ?? 0;
+            setState(() {
+              opponentProgress = (opponentIndex / gameModel.cards.length).clamp(0.0, 1.0);
+            });
+          }
+        }
+      });
+    });
   }
 
+
+  /// Modification de _loadCards pour retourner un Future complet
   Future<void> _loadCards() async {
     try {
       final fetchedCards = await _cardService.fetchCards();
@@ -51,9 +144,13 @@ class _GameScreenState extends State<GameScreen> {
           isLoading = false;
         });
       }
-      // Gérer l'erreur si besoin.
+      // Gérer l'erreur (afficher un message, etc.)
     }
   }
+
+
+
+
 
   void _handleResponse(String userResponse) {
     if (currentCard == null) return;
