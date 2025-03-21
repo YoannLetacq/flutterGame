@@ -1,75 +1,111 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:untitled/models/game_model.dart';
-import 'package:untitled/repositories/game_repository.dart';
+import 'package:untitled/models/player_model.dart';
+import 'package:untitled/repositories/game_repository_interface.dart';
 import 'package:untitled/services/game_service.dart';
 
+// Fake repository stockant les jeux en mémoire.
+class FakeGameRepository implements IGameRepository {
+  final Map<String, Map<String, dynamic>> storage = {};
+
+  @override
+  Future<void> createGame(Map<String, dynamic> gameData) async {
+    String gameId = gameData['id'] as String;
+    storage[gameId] = Map<String, dynamic>.from(gameData);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getGame(String gameId) async {
+    if (storage.containsKey(gameId)) {
+      // Cloner la map pour éviter les modifications externes.
+      return Map<String, dynamic>.from(storage[gameId]!);
+    }
+    return null;
+  }
+
+  @override
+  Future<void> updateGame(String gameId, Map<String, dynamic> updates) async {
+    if (storage.containsKey(gameId)) {
+      storage[gameId]!.addAll(updates);
+    }
+  }
+
+  @override
+  Future<void> deleteGame(String gameId) async {
+    storage.remove(gameId);
+  }
+}
+
 void main() {
-  late FakeFirebaseFirestore fakeFirestore;
-  late GameService gameService;
+  group('GameService', () {
+    late FakeGameRepository fakeRepo;
+    late GameService gameService;
+    late GameModel sampleGame;
 
-  setUp(() {
-    fakeFirestore = FakeFirebaseFirestore();
-    final gameRepository = GameRepository(firestore: fakeFirestore);
-    gameService = GameService(gameRepository: gameRepository);
-  });
-
-  group('GameService Tests', () {
-    test('createGame and getGame', () async {
-      // Créer un GameModel de test
-      final game = GameModel(
-        id: 'game1',
+    setUp(() {
+      fakeRepo = FakeGameRepository();
+      gameService = GameService(gameRepository: fakeRepo);
+      // Préparer un GameModel d'exemple.
+      sampleGame = GameModel(
+        id: 'game_test',
         cards: ['card1', 'card2'],
         mode: GameMode.CLASSIQUE,
-        players: {},
+        players: {
+          'player1': PlayerModel(
+            id: 'player1',
+            cardsOrder: ['card1', 'card2'],
+            currentCardIndex: 0,
+            score: 0,
+            status: 'in game',
+            winner: null,
+          ),
+        },
       );
-
-      // Créer la partie via le service
-      await gameService.createGame(game);
-
-      // Récupérer la partie et vérifier les données
-      final retrievedGame = await gameService.getGame('game1');
-      expect(retrievedGame, isNotNull);
-      expect(retrievedGame!.id, equals('game1'));
-      expect(retrievedGame.cards, equals(['card1', 'card2']));
     });
 
-    test('updateGame', () async {
-      // Préparation : insérer une partie initiale
-      final game = GameModel(
-        id: 'game2',
-        cards: ['card1'],
-        mode: GameMode.CLASSIQUE,
-        players: {},
-      );
-      await gameService.createGame(game);
-
-      // Mettre à jour la partie
-      final updates = {'cards': ['card1', 'card2', 'card3']};
-      await gameService.updateGame('game2', updates);
-
-      // Vérifier la mise à jour
-      final updatedGame = await gameService.getGame('game2');
-      expect(updatedGame, isNotNull);
-      expect(updatedGame!.cards, equals(['card1', 'card2', 'card3']));
+    test('createGame stocke les données du jeu dans le repository', () async {
+      await gameService.createGame(sampleGame);
+      expect(fakeRepo.storage.containsKey('game_test'), isTrue);
+      // Vérifier que l'entrée stockée correspond aux données du GameModel.
+      final storedData = fakeRepo.storage['game_test']!;
+      expect(storedData['id'], sampleGame.id);
+      expect(storedData['cards'], sampleGame.cards);
+      expect(storedData['mode'], 'CLASSIQUE'); // Le GameModel.toJson convertit l'enum en string.
+      expect((storedData['players'] as Map)['player1'], isNotNull);
     });
 
-    test('deleteGame', () async {
-      // Préparation : insérer une partie
-      final game = GameModel(
-        id: 'game3',
-        cards: ['cardX'],
-        mode: GameMode.CLASSIQUE,
-        players: {},
-      );
-      await gameService.createGame(game);
+    test('getGame retourne un GameModel valide si le jeu existe', () async {
+      // Insérer d'abord le jeu via le fakeRepo.
+      fakeRepo.storage['game_test'] = sampleGame.toJson();
+      GameModel? fetchedGame = await gameService.getGame('game_test');
+      expect(fetchedGame, isNotNull);
+      expect(fetchedGame!.id, sampleGame.id);
+      expect(fetchedGame.mode, sampleGame.mode);
+      expect(fetchedGame.players.keys, contains('player1'));
+    });
 
-      // Supprimer la partie
-      await gameService.deleteGame('game3');
+    test('getGame retourne null si le jeu n\'existe pas', () async {
+      GameModel? fetchedGame = await gameService.getGame('inexistant');
+      expect(fetchedGame, isNull);
+    });
 
-      // Vérifier la suppression
-      final deletedGame = await gameService.getGame('game3');
-      expect(deletedGame, isNull);
+    test('updateGame modifie les données de la partie existante', () async {
+      // Insérer le jeu initial.
+      fakeRepo.storage['game_test'] = sampleGame.toJson();
+      // Mettre à jour le mode de jeu et ajouter une carte.
+      await gameService.updateGame('game_test', {
+        'mode': 'CLASSEE',
+        'cards': ['card1', 'card2', 'card3']
+      });
+      final updatedData = fakeRepo.storage['game_test']!;
+      expect(updatedData['mode'], 'CLASSEE');
+      expect(updatedData['cards'], ['card1', 'card2', 'card3']);
+    });
+
+    test('deleteGame supprime la partie du repository', () async {
+      fakeRepo.storage['game_test'] = sampleGame.toJson();
+      await gameService.deleteGame('game_test');
+      expect(fakeRepo.storage.containsKey('game_test'), isFalse);
     });
   });
 }
