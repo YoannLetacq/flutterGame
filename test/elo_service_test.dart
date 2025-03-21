@@ -2,80 +2,52 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:untitled/services/elo_service.dart';
 
 void main() {
-  group('EloService Tests', () {
+  group('EloService', () {
     final eloService = EloService();
 
-    test('Victory scenario (score = 1)', () {
-      // Cas d'une victoire contre un adversaire avec un classement similaire.
-      double playerRating = 1000;
-      double opponentRating = 1000;
-      double score = 1.0;
-      double kFactor = 60;
-
-      double eloChange = eloService.calculateEloChange(
-        playerRating: playerRating,
-        opponentRating: opponentRating,
-        score: score,
-        kFactor: kFactor,
+    test('calcule un gain Elo positif pour une victoire contre un adversaire de même niveau', () {
+      double delta = eloService.calculateEloChange(
+        playerRating: 1500,
+        opponentRating: 1500,
+        score: 1.0, // victoire
+        kFactor: 60,
       );
-
-      // Pour deux joueurs de même classement, expectedScore = 0.5.
-      // Ainsi, eloChange devrait être kFactor * (1 - 0.5) = 60 * 0.5 = 30.
-      expect(eloChange, closeTo(30.0, 0.1));
+      // Score attendu = 0.5, donc delta = 60 * (1 - 0.5) = 30.
+      expect(delta, closeTo(30.0, 0.01));
     });
 
-    test('Defeat scenario (score = 0)', () {
-      // Cas d'une défaite contre un adversaire de même classement.
-      double playerRating = 1000;
-      double opponentRating = 1000;
-      double score = 0.0;
-      double kFactor = 60;
-
-      double eloChange = eloService.calculateEloChange(
-        playerRating: playerRating,
-        opponentRating: opponentRating,
-        score: score,
-        kFactor: kFactor,
+    test('calcule un delta nul pour une égalité entre joueurs de même niveau', () {
+      double delta = eloService.calculateEloChange(
+        playerRating: 1500,
+        opponentRating: 1500,
+        score: 0.5, // égalité
+        kFactor: 60,
       );
-
-      // Pour deux joueurs de même classement, eloChange = 60 * (0 - 0.5) = -30.
-      expect(eloChange, closeTo(-30.0, 0.1));
+      // Score attendu = 0.5, donc delta = 60 * (0.5 - 0.5) = 0.
+      expect(delta, closeTo(0.0, 0.01));
     });
 
-    test('Draw scenario (score = 0.5)', () {
-      // Cas d'une égalité entre deux joueurs.
-      double playerRating = 1000;
-      double opponentRating = 1000;
-      double score = 0.5;
-      double kFactor = 60;
-
-      double eloChange = eloService.calculateEloChange(
-        playerRating: playerRating,
-        opponentRating: opponentRating,
-        score: score,
-        kFactor: kFactor,
+    test('calcule une perte Elo pour une défaite contre un adversaire de même niveau', () {
+      double delta = eloService.calculateEloChange(
+        playerRating: 1500,
+        opponentRating: 1500,
+        score: 0.0, // défaite
+        kFactor: 60,
       );
-
-      // Pour une égalité, eloChange devrait être proche de 0.
-      expect(eloChange, closeTo(0.0, 0.1));
+      // Score attendu = 0.5, donc delta = 60 * (0 - 0.5) = -30.
+      expect(delta, closeTo(-30.0, 0.01));
     });
 
-    test('Victory against higher-rated opponent', () {
-      // Cas où un joueur gagne contre un adversaire mieux classé.
-      double playerRating = 1000;
-      double opponentRating = 1200;
-      double score = 1.0;
-      double kFactor = 60;
-
-      double eloChange = eloService.calculateEloChange(
-        playerRating: playerRating,
-        opponentRating: opponentRating,
-        score: score,
-        kFactor: kFactor,
+    test('prend en compte la différence de classement dans le calcul', () {
+      // Joueur moins bien classé bat un joueur mieux classé.
+      double delta = eloService.calculateEloChange(
+        playerRating: 1400,
+        opponentRating: 1600,
+        score: 1.0, // victoire du joueur moins bien classé
+        kFactor: 60,
       );
-
-      // Dans ce cas, expectedScore est inférieur à 0.5, donc le gain devrait être plus important.
-      expect(eloChange, greaterThan(30.0));
+      // Le gain devrait être supérieur au cas de niveaux égaux (car surprise).
+      expect(delta, greaterThan(30.0));
     });
   });
 }
