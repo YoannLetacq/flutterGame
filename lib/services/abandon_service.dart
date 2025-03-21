@@ -7,7 +7,7 @@ enum AbandonType {
 
 class AbandonService {
   /// Vérifie si l'abandon par inactivité est déclenché.
-  /// Retourne true si le temps écoulé depuis [lastActive] dépasse le [timeout] (par défaut 1 minute).
+  /// Retourne true si le temps écoulé depuis [lastActive] dépasse [timeout] (par défaut 1 minute).
   bool isAbandonedByInactivity(DateTime lastActive, {Duration timeout = const Duration(minutes: 1)}) {
     return DateTime.now().difference(lastActive) > timeout;
   }
@@ -19,7 +19,7 @@ class AbandonService {
   }
 
   /// Vérifie si l'abandon par déconnexion est déclenché.
-  /// Retourne true si le temps écoulé depuis [lastConnected] dépasse le [timeout] (par défaut 1 minute).
+  /// Retourne true si le temps écoulé depuis [lastConnected] dépasse [timeout] (par défaut 1 minute).
   bool isAbandonedByDisconnection(DateTime lastConnected, {Duration timeout = const Duration(minutes: 1)}) {
     return DateTime.now().difference(lastConnected) > timeout;
   }
