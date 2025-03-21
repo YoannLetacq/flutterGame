@@ -3,8 +3,8 @@ class PlayerModel {
   final List<String> cardsOrder;
   final int currentCardIndex;
   final int score;
-  final String status; // "waitingOpponent", "in game", "finished", "abandon", "disconnected"
-  final String? winner; // Peut être null en cas d'égalité ou si la partie n'est pas terminée
+  final String status;
+  final String? winner;
 
   PlayerModel({
     required this.id,
@@ -15,14 +15,22 @@ class PlayerModel {
     this.winner,
   });
 
-  factory PlayerModel.fromJson(Map<String, dynamic> json) {
+  /// Permet de créer une copie de l'instance en modifiant certains champs.
+  PlayerModel copyWith({
+    String? id,
+    List<String>? cardsOrder,
+    int? currentCardIndex,
+    int? score,
+    String? status,
+    String? winner,
+  }) {
     return PlayerModel(
-      id: json['id'] as String,
-      cardsOrder: List<String>.from(json['cardsOrder'] ?? []),
-      currentCardIndex: json['currentCardIndex'] as int? ?? 0,
-      score: json['score'] as int? ?? 0,
-      status: json['status'] as String? ?? '',
-      winner: json['winner'] as String?,
+      id: id ?? this.id,
+      cardsOrder: cardsOrder ?? this.cardsOrder,
+      currentCardIndex: currentCardIndex ?? this.currentCardIndex,
+      score: score ?? this.score,
+      status: status ?? this.status,
+      winner: winner ?? this.winner,
     );
   }
 
@@ -35,5 +43,16 @@ class PlayerModel {
       'status': status,
       'winner': winner,
     };
+  }
+
+  factory PlayerModel.fromJson(Map<String, dynamic> json) {
+    return PlayerModel(
+      id: json['id'] as String,
+      cardsOrder: List<String>.from(json['cardsOrder'] ?? []),
+      currentCardIndex: json['currentCardIndex'] as int? ?? 0,
+      score: json['score'] as int? ?? 0,
+      status: json['status'] as String? ?? '',
+      winner: json['winner'] as String?,
+    );
   }
 }
