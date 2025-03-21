@@ -2,31 +2,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:untitled/services/game_progress_service.dart';
 
 void main() {
-  group('GameProgressService Tests', () {
+  group('GameProgressService', () {
     final progressService = GameProgressService();
 
-    test('Increment index when not at the end', () {
-      // Cas : currentIndex inférieur à totalCards - 1
-      int currentIndex = 2;
+    test('incrémente l\'index si ce n\'est pas la dernière carte', () {
+      int currentIndex = 0;
       int totalCards = 5;
       int newIndex = progressService.incrementCardIndex(currentIndex, totalCards);
-      expect(newIndex, equals(3));
+      expect(newIndex, currentIndex + 1);
     });
 
-    test('Do not increment index when at the end', () {
-      // Cas : currentIndex est égal à totalCards - 1 (dernière carte)
+    test('ne change pas l\'index si la carte courante est la dernière', () {
       int currentIndex = 4;
       int totalCards = 5;
       int newIndex = progressService.incrementCardIndex(currentIndex, totalCards);
-      expect(newIndex, equals(4));
+      expect(newIndex, currentIndex); // reste 4
     });
 
-    test('Increment index from 0 when multiple cards exist', () {
-      // Cas simple, de zéro à un
+    test('gère le cas d\'un index initial à 0 correctement', () {
       int currentIndex = 0;
-      int totalCards = 3;
+      int totalCards = 1;
       int newIndex = progressService.incrementCardIndex(currentIndex, totalCards);
-      expect(newIndex, equals(1));
+      // Avec une seule carte, on reste sur l'index 0.
+      expect(newIndex, 0);
     });
   });
 }
