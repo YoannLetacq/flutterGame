@@ -1,78 +1,78 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:untitled/services/abandon_service.dart';
-import 'package:fake_async/fake_async.dart';
-import 'package:clock/clock.dart';
 
 void main() {
-  group('AbandonService Tests', () {
+  group('AbandonService', () {
     final abandonService = AbandonService();
 
-    test('No abandon when modal not confirmed and within timeout', () {
-      final now = DateTime.now();
-      expect(
-        abandonService.getAbandonType(
-          lastActive: now,
-          lastConnected: now,
-          modalConfirmed: false,
-          timeout: const Duration(minutes: 1),
-        ),
-        equals(AbandonType.none),
+    test('détecte un abandon par inactivité au-delà du délai', () {
+      DateTime lastActive = DateTime.now().subtract(const Duration(minutes: 2));
+      bool result = abandonService.isAbandonedByInactivity(lastActive, timeout:const Duration(minutes: 1));
+      expect(result, isTrue);
+    });
+
+    test('ne détecte pas d\'abandon par inactivité si le délai n\'est pas dépassé', () {
+      DateTime lastActive = DateTime.now().subtract(const Duration(seconds: 30));
+      bool result = abandonService.isAbandonedByInactivity(lastActive, timeout: const Duration(minutes: 1));
+      expect(result, isFalse);
+    });
+
+    test('détecte un abandon par déconnexion au-delà du délai', () {
+      DateTime lastConnected = DateTime.now().subtract(const Duration(minutes: 5));
+      bool result = abandonService.isAbandonedByDisconnection(lastConnected, timeout: const Duration(minutes: 1));
+      expect(result, isTrue);
+    });
+
+    test('détecte un abandon via confirmation modal', () {
+      bool resultTrue = abandonService.isAbandonedByModal(true);
+      bool resultFalse = abandonService.isAbandonedByModal(false);
+      expect(resultTrue, isTrue);
+      expect(resultFalse, isFalse);
+    });
+
+    test('getAbandonType retourne modal en priorité si modalConfirmed est true', () {
+      DateTime now = DateTime.now();
+      // Même si lastActive et lastConnected dépassent le délai, modalConfirmed true doit primer.
+      AbandonType type = abandonService.getAbandonType(
+        lastActive: now.subtract(const Duration(minutes: 10)),
+        lastConnected: now.subtract(const Duration(minutes: 10)),
+        modalConfirmed: true,
+        timeout: const Duration(minutes: 1),
       );
+      expect(type, AbandonType.modal);
     });
 
-    test('Abandon by modal when confirmed', () {
-      final now = DateTime.now();
-      expect(
-        abandonService.getAbandonType(
-          lastActive: now,
-          lastConnected: now,
-          modalConfirmed: true,
-          timeout: const Duration(minutes: 1),
-        ),
-        equals(AbandonType.modal),
+    test('getAbandonType retourne disconnect si déconnexion détectée (et pas de modal)', () {
+      DateTime now = DateTime.now();
+      AbandonType type = abandonService.getAbandonType(
+        lastActive: now.subtract(const Duration(seconds: 30)),
+        lastConnected: now.subtract(const Duration(minutes: 2)),
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
       );
+      expect(type, AbandonType.disconnect);
     });
 
-    test('Abandon by inactivity after timeout', () {
-      fakeAsync((async) {
-        final initialTime = DateTime(2023, 1, 1, 0, 0, 0);
-        withClock(Clock(() => initialTime.add(async.elapsed)), () {
-          async.elapse(const Duration(minutes: 2));
-          async.flushTimers(); // S'assurer que le temps simulé est appliqué
-          expect(
-            abandonService.isAbandonedByInactivity(initialTime, timeout: const Duration(minutes: 1)),
-            isTrue,
-          );
-        });
-      });
-    });
-
-    test('Abandon by disconnection after timeout', () {
-      fakeAsync((async) {
-        final initialTime = DateTime(2023, 1, 1, 0, 0, 0);
-        withClock(Clock(() => initialTime.add(async.elapsed)), () {
-          async.elapse(const Duration(seconds: 90));
-          async.flushTimers();
-          expect(
-            abandonService.isAbandonedByDisconnection(initialTime, timeout: const Duration(minutes: 1)),
-            isTrue,
-          );
-        });
-      });
-    });
-
-    test('Priority of abandonment: modal over others', () {
-      // Même si l'inactivité serait dépassée, si modal est confirmé, le type modal doit être retourné.
-      final now = DateTime.now().subtract(const Duration(minutes: 2)); // inactivité déjà dépassée
-      expect(
-        abandonService.getAbandonType(
-          lastActive: now,
-          lastConnected: now,
-          modalConfirmed: true,
-          timeout: const Duration(minutes: 1),
-        ),
-        equals(AbandonType.modal),
+    test('getAbandonType retourne inactive si seulement inactivité détectée', () {
+      DateTime now = DateTime.now();
+      AbandonType type = abandonService.getAbandonType(
+        lastActive: now.subtract(const Duration(minutes: 2)),
+        lastConnected: now.subtract(const Duration(seconds: 30)),
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
       );
+      expect(type, AbandonType.inactive);
+    });
+
+    test('getAbandonType retourne none si aucune condition remplie', () {
+      DateTime now = DateTime.now();
+      AbandonType type = abandonService.getAbandonType(
+        lastActive: now.subtract(const Duration(seconds: 30)),
+        lastConnected: now.subtract(const Duration(seconds: 30)),
+        modalConfirmed: false,
+        timeout: const Duration(minutes: 1),
+      );
+      expect(type, AbandonType.none);
     });
   });
 }
