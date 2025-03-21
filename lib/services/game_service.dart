@@ -7,14 +7,14 @@ class GameService {
   GameService({required IGameRepository gameRepository})
       : _gameRepository = gameRepository;
 
-  /// Crée une nouvelle partie à partir d'une instance de GameModel.
-  /// Ici, l'ID est déjà présent dans le modèle.
+  /// Crée une nouvelle partie à partir d'une instance de [GameModel].
+  /// On suppose que l'ID est déjà présent dans le modèle.
   Future<void> createGame(GameModel game) async {
     final gameData = game.toJson();
     await _gameRepository.createGame(gameData);
   }
 
-  /// Récupère une partie sous forme de GameModel à partir de son ID.
+  /// Récupère une partie (sous forme de [GameModel]) à partir de son [gameId].
   Future<GameModel?> getGame(String gameId) async {
     final data = await _gameRepository.getGame(gameId);
     if (data != null) {
@@ -28,7 +28,7 @@ class GameService {
     await _gameRepository.updateGame(gameId, updates);
   }
 
-  /// Supprime une partie à partir de son ID.
+  /// Supprime une partie à partir de son [gameId].
   Future<void> deleteGame(String gameId) async {
     await _gameRepository.deleteGame(gameId);
   }
