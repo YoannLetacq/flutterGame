@@ -11,7 +11,8 @@ class HistoryService {
 
   /// Enregistre l'historique d'une partie pour l'utilisateur [userId].
   /// [historyData] doit contenir les informations de la partie (date, résultat, score, exp, eloChange, etc.)
-  Future<void> recordGameHistory(String userId, Map<String, dynamic> historyData) async {
+  Future<void> recordGameHistory(String userId,
+      Map<String, dynamic> historyData) async {
     if (!_securityService.validateHistoryData(historyData)) {
       throw Exception("Données d'historique invalides");
     }
@@ -32,4 +33,27 @@ class HistoryService {
       rethrow;
     }
   }
+
+  /// Récupère les 10 dernières parties de l'utilisateur [userId], triées par date décroissante.
+  Future<List<Map<String, dynamic>>> getRecentGames(String userId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('game_history')
+          .doc(userId)
+          .collection('history')
+          .orderBy('date', descending: true)
+          .limit(10)
+          .get();
+      return querySnapshot.docs
+          .map((doc) => doc.data())
+          .toList();
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print("Erreur lors de la récupération de l'historique : $e");
+      }
+      rethrow;
+    }
+  }
 }
+
+
