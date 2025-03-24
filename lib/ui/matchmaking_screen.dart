@@ -23,9 +23,10 @@ class _MatchmakingScreenState extends State<MatchmakingScreen> {
 
   @override
   void initState() {
+    if (mounted) {
+      _startMatchmaking();
+    }
     super.initState();
-    // Démarrer le matchmaking dès l'affichage de l'écran.
-    _startMatchmaking();
   }
 
   Future<void> _startMatchmaking() async {
