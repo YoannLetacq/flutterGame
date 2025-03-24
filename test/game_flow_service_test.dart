@@ -50,6 +50,7 @@ class FakeDatabaseReference implements DatabaseReference {
     return FakeDatabaseEvent(data);
   }
 
+
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
