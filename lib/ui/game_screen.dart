@@ -8,6 +8,7 @@ import 'package:untitled/ui/widgets/card_widget.dart';
 class GameScreen extends StatefulWidget {
   final GameMode mode;
   final String? gameId; // null si on crée une nouvelle partie, non-null si on rejoint.
+  static const routeName = '/game';
 
   const GameScreen({super.key, this.mode = GameMode.CLASSIQUE, this.gameId});
 
