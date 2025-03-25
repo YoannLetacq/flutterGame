@@ -1,58 +1,29 @@
 import 'package:flutter/material.dart';
 
+/// Widget de barre de progression pour le joueur local.
+/// - Rôle : indiquer la progression du joueur à travers ses cartes.
+/// - Dépendances : aucune (fonctionne sur les valeurs passées en paramètre).
+/// - Affiche une barre de progression avec le pourcentage de cartes complétées.
 class PlayerProgressBarWidget extends StatelessWidget {
-  final double progress; // Valeur entre 0 et 1
-  final String avatarUrl;
+  final int currentIndex;
+  final int totalCards;
 
   const PlayerProgressBarWidget({
     super.key,
-    required this.progress,
-    required this.avatarUrl,
+    required this.currentIndex,
+    required this.totalCards,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    double progress = totalCards > 0 ? currentIndex / totalCards : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar à gauche
-        CircleAvatar(
-          backgroundImage: avatarUrl.startsWith('http')
-              ? NetworkImage(avatarUrl)
-              : AssetImage(avatarUrl) as ImageProvider,
-          radius: 24,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: progress),
-            duration: const Duration(milliseconds: 500),
-            builder: (context, value, child) {
-              return Container(
-                height: 20,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  // Gradient du rose vers le bleu, intensité croissante
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.lerp(
-                        Colors.pinkAccent.withOpacity(0.5),
-                        Colors.blueAccent,
-                        value,
-                      )!,
-                      Color.lerp(
-                        Colors.pinkAccent.withOpacity(0.2),
-                        Colors.blue,
-                        value,
-                      )!,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+        const Text('Vous', style: TextStyle(fontWeight: FontWeight.bold)),
+        LinearProgressIndicator(value: progress, minHeight: 8),
+        const SizedBox(height: 4),
+        Text('${(progress * 100).toStringAsFixed(0)}%'),
       ],
     );
   }

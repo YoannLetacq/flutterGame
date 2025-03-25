@@ -1,56 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:untitled/providers/connectivity_provider.dart';
+import '../../services/auth_service.dart';
+import '../../services/user_profile_service.dart';
 import 'login_screen.dart';
 import 'matchmaking_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
+/// Écran d'accueil (après connexion).
+/// - Affiche les informations de profil du joueur (nom, avatar, Elo).
+/// - Propose de lancer une partie classée ou classique.
+/// - Permet de se déconnecter.
 class HomeScreen extends StatelessWidget {
-  static const routeName = '/home';
-
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final connectivityResults = Provider.of<ConnectivityProvider>(context).connectivityResults;
-    String connectivityText = 'Aucun résultat';
-    if (connectivityResults.isNotEmpty) {
-      connectivityText = connectivityResults.first.toString().replaceAll('ConnectivityResult.', '');
-    }
-    final user = FirebaseAuth.instance.currentUser;
-    final displayName = user?.displayName ?? user?.email ?? 'Utilisateur';
+    final userProfile = Provider.of<UserProfileService>(context, listen: false).getUserProfile();
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final userName = userProfile['displayName'] ?? 'Joueur';
+    final elo = userProfile['elo'] ?? ''; // 'elo' n'est pas renvoyé par getUserProfile (on pourrait le récupérer via Firestore)
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Zone01 Game - Accueil'),
+        title: Text('Bienvenue, $userName'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.exit_to_app),
+            onPressed: () async {
+              await authService.signOut();
+              // Retour au LoginScreen après déconnexion
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            tooltip: 'Se déconnecter',
+          )
+        ],
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
+          children: [
+            if (userProfile['avatarUrl']!.isNotEmpty)
+              CircleAvatar(
+                radius: 40,
+                backgroundImage: NetworkImage(userProfile['avatarUrl']!),
+              ),
+            const SizedBox(height: 10),
             Text(
-              'Bienvenue, $displayName',
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
+              userName,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'État de connexion: $connectivityText',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 20),
+            if (elo != '')
+              Text(
+                'Elo : $elo',
+                style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+              ),
+            const SizedBox(height: 30),
             ElevatedButton(
+              child: const Text('Jouer - Partie Classique'),
               onPressed: () {
-                Navigator.pushNamed(context, MatchmakingScreen.routeName);
+                // Démarre la recherche d'une partie classique
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const MatchmakingScreen(isRanked: false),
+                    transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                      position: Tween<Offset>(begin: const Offset(1.0, 0.0), end: Offset.zero).animate(anim),
+                      child: child,
+                    ),
+                  ),
+                );
               },
-              child: const Text('Lancer le jeu'),
             ),
-            const SizedBox(height: 20),
             ElevatedButton(
+              child: const Text('Jouer - Partie Classée'),
               onPressed: () {
-                Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+                // Démarre la recherche d'une partie classée
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const MatchmakingScreen(isRanked: true),
+                    transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                      position: Tween<Offset>(begin: const Offset(1.0, 0.0), end: Offset.zero).animate(anim),
+                      child: child,
+                    ),
+                  ),
+                );
               },
-              child: const Text('Se déconnecter'),
             ),
           ],
         ),

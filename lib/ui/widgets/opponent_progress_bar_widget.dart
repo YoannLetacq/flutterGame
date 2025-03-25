@@ -1,57 +1,29 @@
 import 'package:flutter/material.dart';
 
+/// Widget de barre de progression pour l'adversaire.
+/// - Rôle : indiquer l'avancement de l'adversaire dans ses cartes.
+/// - Dépendances : aucune (prend les valeurs en entrée).
+/// - Affiche une barre de progression représentant le pourcentage de cartes terminées par l'adversaire.
 class OpponentProgressBarWidget extends StatelessWidget {
-  final double progress; // Valeur entre 0 et 1
-  final String avatarUrl;
+  final int currentIndex;
+  final int totalCards;
 
   const OpponentProgressBarWidget({
     super.key,
-    required this.progress,
-    required this.avatarUrl,
+    required this.currentIndex,
+    required this.totalCards,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    double progress = totalCards > 0 ? currentIndex / totalCards : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: progress),
-            duration: const Duration(milliseconds: 500),
-            builder: (context, value, child) {
-              return Container(
-                height: 20,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  // Même gradient, intensité croissante vers le bleu
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.lerp(
-                        Colors.pinkAccent.withOpacity(0.5),
-                        Colors.blueAccent,
-                        value,
-                      )!,
-                      Color.lerp(
-                        Colors.pinkAccent.withOpacity(0.2),
-                        Colors.blue,
-                        value,
-                      )!,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        CircleAvatar(
-          backgroundImage: avatarUrl.startsWith('http')
-              ? NetworkImage(avatarUrl)
-              : AssetImage(avatarUrl) as ImageProvider,
-          radius: 24,
-        ),
+        const Text('Adversaire', style: TextStyle(fontWeight: FontWeight.bold)),
+        LinearProgressIndicator(value: progress, minHeight: 8, color: Colors.redAccent),
+        const SizedBox(height: 4),
+        Text('${(progress * 100).toStringAsFixed(0)}%'),
       ],
     );
   }
