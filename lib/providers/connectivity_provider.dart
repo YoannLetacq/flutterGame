@@ -1,31 +1,26 @@
-import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:untitled/services/connectivity_service.dart';
-/// Provides the connectivity results to the app.
-///
-/// This provider listens to the [ConnectivityService] and updates the connectivity results.
+import 'package:flutter/foundation.dart';
+import '../services/connectivity_service.dart';
+
+/// Provider de connectivité réseau (ChangeNotifier).
+/// - Rôle : notifier l'UI des changements d'état réseau (en ligne/hors ligne) du joueur.
+/// - Dépendances : [ConnectivityService] pour interroger l'état de la connexion.
+/// - Retourne un booléen `isConnected` via le ChangeNotifier (true si connecté).
 class ConnectivityProvider with ChangeNotifier {
   final ConnectivityService _connectivityService = ConnectivityService();
-  List<ConnectivityResult> _connectivityResults = [];
-
-  List<ConnectivityResult> get connectivityResults => _connectivityResults;
+  bool _isConnected = true;
 
   ConnectivityProvider() {
-    _initConnectivity();
-    _connectivityService.connectivityStream.listen((results) {
-      _connectivityResults = results;
-      notifyListeners();
+    // Initialise en écoutant les changements de connectivité.
+    Connectivity().onConnectivityChanged.listen((result) {
+      bool nowConnected = result != ConnectivityResult.none;
+      if (_isConnected != nowConnected) {
+        _isConnected = nowConnected;
+        notifyListeners();
+      }
     });
   }
 
-  Future<void> _initConnectivity() async {
-    try {
-      _connectivityResults = await _connectivityService.checkConnectivity();
-      notifyListeners();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error: $e');
-      }
-    }
-  }
+  /// Indique si l'appareil est actuellement connecté à Internet.
+  bool get isConnected => _isConnected;
 }
