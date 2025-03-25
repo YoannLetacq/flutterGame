@@ -1,27 +1,13 @@
-import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 
+/// Service utilitaire de connectivité réseau.
+/// - Rôle : fournir l'état courant de la connexion Internet.
+/// - Dépendances : plugin Connectivity.
+/// - Retourne l'état de connexion (connecté ou non).
 class ConnectivityService {
-  final Connectivity _connectivity = Connectivity();
-
-  /// Retourne le stream de ConnectivityResult pour écouter les changements de connectivité.
-  Stream<List<ConnectivityResult>> get connectivityStream => _connectivity.onConnectivityChanged;
-
-  /// Vérifie l'état de connexion actuel.
-  Future<List<ConnectivityResult>> checkConnectivity() async {
-    try {
-      final result = await _connectivity.checkConnectivity();
-      if (kDebugMode) {
-        print('État de la connectivité vérifié: $result');
-      }
-      return result;
-    } catch (e, stackTrace) {
-      if (kDebugMode) {
-        print('Erreur lors de la vérification de la connectivité: $e');
-        print(stackTrace);
-      }
-      rethrow;
-    }
+  /// Vérifie la connexion réseau actuelle.
+  Future<bool> checkConnection() async {
+    ConnectivityResult result = (await Connectivity().checkConnectivity()) as ConnectivityResult;
+    return result != ConnectivityResult.none;
   }
 }
