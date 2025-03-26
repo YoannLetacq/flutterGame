@@ -156,7 +156,16 @@ class MatchmakingService with ChangeNotifier {
    });
  }
 
+ Future<void> stopMatchmaking(String userId, GameMode mode) async {
+    // Annule la recherche de partie en cours
+   await _waitingSubscribtion?.cancel();
+    _waitingSubscribtion = null;
+    _isWaiting = false;
+    notifyListeners();
+ }
 
+  bool get isWaiting => _isWaiting;
+  GameModel? get currentGame => _currentgame;
 }
 
 
