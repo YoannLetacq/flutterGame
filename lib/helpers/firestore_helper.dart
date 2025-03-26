@@ -45,6 +45,26 @@ class FirestoreHelper {
     }
   }
 
+  /// get collection
+  static Future<QuerySnapshot<Map<String, dynamic>>> getCollection({
+    required String collection,
+  }) async {
+    try {
+      final snapshot = await _db.collection(collection).get();
+      if (kDebugMode) {
+        print('Collection retrieved: $collection');
+      }
+      return snapshot;
+    } catch (e, stack) {
+      if (kDebugMode) {
+        print('Error getting collection: $e');
+        print(stack);
+      }
+      rethrow;
+    }
+  }
+
+
   /// Update un document
   static Future<void> updateDocument({
     required String collection,
