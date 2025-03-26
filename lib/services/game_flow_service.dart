@@ -58,7 +58,7 @@ class GameFlowService {
       RealtimeDBHelper.updateData(
         'games/${game.id}',
         {
-          'startTinme': DateTime.now().millisecondsSinceEpoch,
+          'startTime': DateTime.now().millisecondsSinceEpoch,
           'modeSpeedUp': false,
         },
       );
