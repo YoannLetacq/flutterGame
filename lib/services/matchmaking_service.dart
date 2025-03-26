@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:untitled/helpers/realtime_db_helper.dart';
@@ -11,8 +13,7 @@ import '../models/player_model.dart';
 /// Rôle : Apparier automatiquement les joueurs deux par deux via la Realtime Database de Firebase.
 /// Dépendances : [FirebaseDatabase] pour accéder à la DB en temps réel.
 /// Retourne un [GameModel] nouvellement créé si un adversaire est trouvé, ou null si le joueur est placé en attente.
-class MatchmakingService {
-
+class MatchmakingService with ChangeNotifier {
   /// Lance la recherche d'une partie pour le joueur [userId] en mode [mode] (CLASSIQUE ou CLASSEE).
   ///
   /// Si un autre joueur est déjà en attente, retire cette attente et crée une partie partagée.
@@ -108,6 +109,54 @@ class MatchmakingService {
     }
     return newGame;
   }
+
+  StreamSubscription<DatabaseEvent>? _waitingSubscribtion;
+  GameModel? _currentgame;
+  bool _isWaiting = false;
+
+  /// StartMatchmaking
+  /// - Lance la recherche d'une partie pour le joueur [userId] en mode [mode] (CLASSIQUE ou CLASSEE).
+
+  Future<void> startMatchMaking(String userId, GameMode mode) async {
+    // Si findmatch retourne un GameModel non null, on est en partie
+    // Sinon on est en attente, dans les deux cas on le signal a l'ui.
+
+    final game = await findMatch(userId, mode);
+    if (game != null) {
+       _currentgame = game;
+      _isWaiting = false;
+      notifyListeners();
+      return;
+    } else {
+      _isWaiting = true;
+      notifyListeners();
+
+      _listenForOpponent(userId, mode);
+    }
+  }
+
+ void _listenForOpponent(String userId, GameMode mode) {
+    final String modeKey = mode == GameMode.CLASSEE ? 'ranked' : 'casual';
+    final DatabaseReference waitingRef = FirebaseDatabase.instance.ref('matchmaking/$modeKey/waiting');
+
+   _waitingSubscribtion = waitingRef.onValue.listen((event) async {
+     final data = event.snapshot.value;
+     if (data != null && data is String  && data != userId) {
+       // relancer findMatch si un adversaire est trouvé
+        final game = await findMatch(userId, mode);
+        if (game != null) {
+          _currentgame = game;
+          _isWaiting = false;
+          // on arrete l'ecoute
+          await _waitingSubscribtion?.cancel();
+          _waitingSubscribtion = null;
+          notifyListeners();
+        }
+     }
+   });
+ }
+
+
 }
 
 
