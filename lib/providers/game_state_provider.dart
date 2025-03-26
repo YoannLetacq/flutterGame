@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import '../models/game_model.dart';
 import '../services/game_flow_service.dart';
 
 /// Provider qui expose l'etat du jeu en cours.
@@ -32,8 +31,8 @@ class GameStateProvider extends ChangeNotifier {
     _listenGameFlow();
   }
 
-  void _listenGameFlow() {
-    _gameStateStream = gameFlowService.listenGameState();
+  void _listenGameFlow() async {
+    _gameStateStream = await gameFlowService.listenGameState();
     _gameStateStream.listen((event) {
      final gameData = event.snapshot.value as Map?;
      if (gameData != null) {
