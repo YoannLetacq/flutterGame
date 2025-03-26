@@ -1,3 +1,5 @@
+import 'package:untitled/models/card_model.dart';
+
 import 'player_model.dart';
 
 /// Enumération des modes de jeu disponibles.
@@ -14,7 +16,7 @@ enum GameMode {
 /// - [players] : map des joueurs participant à la partie, indexée par leur UID.
 class GameModel {
   final String id;
-  final List<String> cards;
+  final List<CardModel> cards;
   final GameMode mode;
   final Map<String, PlayerModel> players;
 
@@ -29,7 +31,7 @@ class GameModel {
   factory GameModel.fromJson(Map<String, dynamic> json) {
     return GameModel(
       id: json['id'] as String,
-      cards: List<String>.from(json['cards'] ?? []),
+      cards: (json['cards'] as List<dynamic>).map((e) => CardModel.fromJson(e)).toList(),
       mode: (json['mode'] as String).toUpperCase() == "CLASSEE" ? GameMode.CLASSEE : GameMode.CLASSIQUE,
       players: (json['players'] as Map<String, dynamic>).map(
             (key, value) => MapEntry(key, PlayerModel.fromJson(value)),
