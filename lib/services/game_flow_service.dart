@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:untitled/helpers/realtime_db_helper.dart';
 import 'timer_service.dart';
 import 'game_progress_service.dart';
 import 'abandon_service.dart';
@@ -34,7 +35,10 @@ class GameFlowService {
     required this.eloService,
     required this.game,
     required this.gameRef,
-  });
+  }) {
+    localPlayerId = game.players.keys.first;
+    opponentPlayerId = game.players.keys.last;
+  }
 
   /// Démarre la partie : lance le chronomètre et initialise l'état de départ dans la DB.
   /// [onTick] est appelé chaque seconde avec le temps écoulé.
@@ -50,12 +54,15 @@ class GameFlowService {
       if (kDebugMode) {
         print('Chronomètre démarré.');
       }
-      // Enregistre l'heure de début et désactive le mode speed-up initialement.
-      gameRef.update({
-        'startTime': DateTime.now().millisecondsSinceEpoch,
-        'modeSpeedUp': false,
-      });
-      // Initialise l'état du joueur local dans la DB.
+      // Mise à jour de l'état du joueur local dans la DB.
+      RealtimeDBHelper.updateData(
+        'games/${game.id}',
+        {
+          'startTinme': DateTime.now().millisecondsSinceEpoch,
+          'modeSpeedUp': false,
+        },
+      );
+      // Mettre a  joueur l'etat du local
       updatePlayerState(playerId);
     } catch (e, stackTrace) {
       if (kDebugMode) {
@@ -69,7 +76,8 @@ class GameFlowService {
   /// Met à jour l'état du joueur [playerId] dans la partie (par ex. score, index courant, statut) dans la DB Realtime.
   Future<void> updatePlayerState(String playerId) async {
     try {
-      await gameRef.child('players').child(playerId).update({
+      await RealtimeDBHelper.updateData('games/${game.id}/players/$playerId',
+        {
         'currentCardIndex': currentCardIndex,
         'score': 0,    // initialisé à 0 au départ
         'status': 'in game',
@@ -91,9 +99,9 @@ class GameFlowService {
     try {
       timerService.stopTimer();
       isGameEnded = true;
-      await gameRef.child('players').child(playerId).update({
-        'status': 'finished',
-      });
+      await  RealtimeDBHelper.updateData('games/${game.id}/players/$playerId',
+          {'status': 'finished'}
+      );
       if (kDebugMode) {
         print('Partie terminée pour $playerId, chronomètre arrêté.');
       }
@@ -108,7 +116,8 @@ class GameFlowService {
 
   /// Écoute en temps réel les mises à jour de l'état de la partie (sous-arbre complet).
   /// Permet d'être notifié dès qu'un changement intervient (ex: l'autre joueur a fini ses cartes ou a abandonné).
-  Stream<DatabaseEvent> listenGameState() {
-    return gameRef.onValue;
+  Future<Stream<DatabaseEvent>> listenGameState() async {
+    final DatabaseReference ref = await RealtimeDBHelper.ref('games/${game.id}');
+    return ref.onValue;
   }
 }
