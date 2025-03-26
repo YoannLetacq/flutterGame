@@ -72,4 +72,29 @@ class RealtimeDBHelper {
       rethrow;
     }
   }
+
+  /// get a reference
+  static Future<DatabaseReference> ref(String path) async {
+    try {
+      return _db.ref(path);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting reference: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// push data
+  static Future<DatabaseReference> push(String path) async{
+    try {
+      return _db.ref(path).push();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error pushing data: $e');
+      }
+      rethrow;
+    }
+  }
+
 }
