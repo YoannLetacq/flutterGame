@@ -20,6 +20,10 @@ class GameFlowService {
   final GameModel game;
   final DatabaseReference gameRef; // Référence à la partie dans Firebase Realtime Database
 
+  // Identifiant pour le joueur local et l'adversaire
+  late final String localPlayerId;
+  late final String opponentPlayerId;
+
   int currentCardIndex = 0;
   bool isGameEnded = false;
 
