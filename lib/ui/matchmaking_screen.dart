@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/game_model.dart';
@@ -10,95 +8,65 @@ import 'game_screen.dart';
 /// Écran de matchmaking.
 /// - Met en attente le joueur et affiche un indicateur de recherche de joueur.
 /// - Lorsqu'un adversaire est trouvé, passe à l'écran de jeu correspondant en récupérant l'ID de la partie depuis Firebase Realtime Database.
-class MatchmakingScreen extends StatefulWidget {
+class MatchmakingScreen extends StatelessWidget {
   final bool isRanked;
+
   const MatchmakingScreen({super.key, required this.isRanked});
 
-  @override
-  _MatchmakingScreenState createState() => _MatchmakingScreenState();
-}
-
-class _MatchmakingScreenState extends State<MatchmakingScreen> {
-  String? _statusMessage;
-  StreamSubscription<DatabaseEvent>? _matchSub;
-
-  @override
-  void initState() {
-    super.initState();
-    // Démarre la recherche de match dès que l'écran est affiché.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startMatchmaking());
-  }
-
-  @override
-  void dispose() {
-    _matchSub?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _startMatchmaking() async {
-    final matchmakingService = Provider.of<MatchmakingService>(context, listen: false);
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final user = authService.currentUser;
-    if (user == null) {
-      setState(() {
-        _statusMessage = "Erreur : utilisateur non authentifié.";
-      });
-      return;
-    }
-    final String userId = user.uid;
-    setState(() => _statusMessage = "Recherche d'un joueur...");
-
-    GameMode mode = widget.isRanked ? GameMode.CLASSEE : GameMode.CLASSIQUE;
-    // Appel du matchmaking via le service
-    GameModel? game = await matchmakingService.findMatch(userId, mode);
-    if (game != null) {
-      _navigateToGame(game);
-    } else {
-      // Aucun match immédiat : mettre en place un listener sur le noeud d'attente pour détecter une modification.
-      final String modeKey = widget.isRanked ? 'ranked' : 'casual';
-      final DatabaseReference waitingRef = FirebaseDatabase.instance.ref('matchmaking/$modeKey/waiting');
-      _matchSub = waitingRef.onValue.listen((event) async {
-        final data = event.snapshot.value;
-        // Si la valeur est différente de l'uid actuel, on considère qu'un match est trouvé.
-        if (data != null && data is String && data != userId) {
-          final String gameId = data;
-          // On peut récupérer ici la partie complète si nécessaire.
-          // Pour cet exemple, nous créons un GameModel minimal.
-          GameModel matchedGame = GameModel(
-            id: gameId,
-            cards: [], // Charger la liste de cartes via CardService dans une version complète.
-            mode: mode,
-            players: {}, // Les informations des joueurs devront être chargées depuis la DB.
-          );
-          // Annuler l'abonnement avant de naviguer.
-          await _matchSub?.cancel();
-          _navigateToGame(matchedGame);
-        }
-      });
-    }
-  }
-
-  void _navigateToGame(GameModel game) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => GameScreen(game: game)),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isRanked ? 'Matchmaking Classé' : 'Matchmaking Classique'),
-      ),
-      body: Center(
-        child: _statusMessage == null
-            ? const CircularProgressIndicator()
-            : Text(
-          _statusMessage!,
-          style: const TextStyle(fontSize: 18),
-          textAlign: TextAlign.center,
+    final MatchmakingService matchmakingService = Provider.of<MatchmakingService>(context);
+    final user = Provider.of<AuthService>(context).currentUser;
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Matchmaking')),
+        body: const Center(child: Text('Erreur: Pas authentifie'),),
+      );
+    }
+
+    // Lance la recherche d'une partie
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!matchmakingService.isWaiting && matchmakingService.currentGame == null) {
+        matchmakingService.startMatchMaking(user.uid, isRanked ? GameMode.CLASSEE : GameMode.CLASSIQUE);
+      }
+    });
+
+    // Si la partie est trouvew, on passe à l'écran de jeu
+    if (matchmakingService.currentGame != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+       context,
+        MaterialPageRoute(
+          builder: (_) => GameScreen(game: matchmakingService.currentGame!),
         ),
+      );
+    });
+      return const SizedBox.shrink();
+    }
+    return Scaffold(
+      appBar: AppBar(title: isRanked ? const Text('Matchmaking classé') : const Text('Matchmaking')),
+      body: Center(
+        child: matchmakingService.isWaiting ?
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("En attente d'un adversaire..."),
+                const SizedBox(height: 20),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                ElevatedButton(onPressed:
+                () {
+        // Stop le matchmaking
+        matchmakingService.stopMatchmaking(user.uid,
+        isRanked ? GameMode.CLASSEE : GameMode.CLASSIQUE);
+    Navigator.pop(context);
+  },
+    child: const Text('Annuler la recherche'),
+    ),
+                ],
+              ) :
+            const CircularProgressIndicator(),
       ),
     );
   }
