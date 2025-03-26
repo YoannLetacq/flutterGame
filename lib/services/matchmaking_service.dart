@@ -89,6 +89,10 @@ class MatchmakingService {
         status: 'in game',
         winner: null);
 
+    if (kDebugMode) {
+      print('[MatchmakingService] Players created: current : $userId, opponent : ${snapshot.value}');
+    }
+
     // on construit la nouvelle partie
     final GameModel newGame = GameModel(
       players: {userId: player1, snapshot.value as String: player2},
