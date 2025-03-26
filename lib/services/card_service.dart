@@ -1,19 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:untitled/helpers/firestore_helper.dart';
 import 'package:untitled/models/card_model.dart';
 
 
 /// Service pour récupérer les cartes depuis Firestore.
 class CardService {
-  final FirebaseFirestore _firestore;
-
-  CardService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// Récupère la liste des cartes depuis la collection "cards".
   Future<List<CardModel>> fetchCards() async {
     try {
-      final snapshot = await _firestore.collection('cards').get();
+      final snapshot = await FirestoreHelper.getCollection(collection: 'cards');
       if (kDebugMode) {
         print('Cartes récupérées: ${snapshot.docs.length}');
       }
