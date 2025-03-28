@@ -1,3 +1,5 @@
+import 'package:untitled/helpers/firestore_helper.dart';
+
 /// Évalue la réponse de l'utilisateur.
 ///
 /// [userResponseIndex] est l'index de l'option choisie par l'utilisateur.
@@ -8,7 +10,6 @@ class ResponseService {
   int? get score => answerCount;
 
   /// Évalue la réponse de l'utilisateur par rapport à la réponse attendue.
-  /// Retourne true si la similarité dépasse le seuil (par défaut 0.8), sinon false.
   bool evaluateResponse(int userResponseIndex, int expectedIndex) {
     if (userResponseIndex == expectedIndex) {
       answerCount++;
@@ -16,5 +17,16 @@ class ResponseService {
     }
     return false;
 
+  }
+
+/// Recupere la reponse dans la database.
+  /// answer est l'index de la bonne reponse parmis options.
+  Future<int> getAnswerFromDB(String collection, String docId, String field) async {
+    final answer = await FirestoreHelper.getField(
+        collection: collection,
+        docId: docId,
+        field: field
+    );
+    return answer as int;
   }
 }
