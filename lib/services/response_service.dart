@@ -1,15 +1,20 @@
-import 'package:untitled/services/similarity_service.dart';
-
+/// Évalue la réponse de l'utilisateur.
+///
+/// [userResponseIndex] est l'index de l'option choisie par l'utilisateur.
+/// [expectedIndex] est l'index correct stocké dans la carte (champ answer).
+/// Retourne true si les indices correspondent, sinon false.
 class ResponseService {
-  final SimilarityService similarityService;
-
-  ResponseService({SimilarityService? similarityService})
-      : similarityService = similarityService ?? SimilarityService();
+  int answerCount = 0;
+  int? get score => answerCount;
 
   /// Évalue la réponse de l'utilisateur par rapport à la réponse attendue.
   /// Retourne true si la similarité dépasse le seuil (par défaut 0.8), sinon false.
-  bool evaluateResponse(String userResponse, String expectedResponse, {double threshold = 0.8}) {
-    final double similarity = similarityService.calculateSimilarity(userResponse, expectedResponse);
-    return similarity >= threshold;
+  bool evaluateResponse(int userResponseIndex, int expectedIndex) {
+    if (userResponseIndex == expectedIndex) {
+      answerCount++;
+      return true;
+    }
+    return false;
+
   }
 }
