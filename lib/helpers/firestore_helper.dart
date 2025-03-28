@@ -45,6 +45,15 @@ class FirestoreHelper {
     }
   }
 
+  /// get  a field from a document
+  static Future<dynamic> getField({
+    required String collection,
+    required String docId,
+    required String field
+}) {
+    return getDocument(collection: collection, docId: docId).then((doc) => doc.data()?[field]);
+  }
+
   /// get collection
   static Future<QuerySnapshot<Map<String, dynamic>>> getCollection({
     required String collection,
