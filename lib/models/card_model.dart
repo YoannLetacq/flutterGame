@@ -2,7 +2,7 @@ class CardModel {
   final String id;
   final String name;
   final String definition;
-  final String answer;
+  final int answer;
   final String explanation;
   final List<String> hints;
   final String imageUrl;
@@ -26,7 +26,7 @@ class CardModel {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       definition: json['definition'] as String? ?? '',
-      answer: json['answer'] as String? ?? '',
+      answer: json['answer'] as int? ?? 0,
       explanation: json['explanation'] as String? ?? '',
       hints: json['hints'] is List
           ? List<String>.from(json['hints'])
