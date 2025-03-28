@@ -37,16 +37,32 @@ class GameStateProvider extends ChangeNotifier {
      final gameData = event.snapshot.value as Map?;
      if (gameData != null) {
        // Mise a jour de l'etat du joueur local
-       final playerData = gameData['players'] as Map?;
+       final playerData = (gameData['players'] as Map?)?.cast<String, dynamic>();
        if (playerData != null) {
          final localData = playerData[gameFlowService.localPlayerId] as Map?;
          if (localData != null) {
            // Mise a jour de l'etat local a partir de la DB
-            _currentCardIndex = localData['currentCardIndex'] ?? _currentCardIndex;
-            _elapsedTime = localData['elapsedTime'] ?? _elapsedTime;
-            _playerStatus = localData['status'] ?? _playerStatus;
-            _gameResult = localData['gameResult'] ?? _gameResult;
-            _isOnline = localData['isOnline'] ?? _isOnline;
+           // Uniquement si lq valeur a change
+           int newCardIndex = localData['currentCardIndex'] ?? _currentCardIndex;
+           int newElapsedTime = localData['elapsedTime'] ?? _elapsedTime;
+           String newStatus = localData['status'] ?? _playerStatus;
+           bool newIsOnline = localData['isOnline'] ?? _isOnline;
+           bool newGameResult = localData['gameResult'] ?? _gameResult;
+
+           bool hasChanged = newCardIndex != _currentCardIndex ||
+            newElapsedTime != _elapsedTime ||
+            newStatus != _playerStatus ||
+            newIsOnline != _isOnline ||
+            newGameResult != _gameResult;
+
+           if (hasChanged) {
+             _currentCardIndex = newCardIndex;
+             _elapsedTime = newElapsedTime;
+             _playerStatus = newStatus;
+             _isOnline = newIsOnline;
+             _gameResult = newGameResult;
+           }
+
          }
        }
        notifyListeners();
