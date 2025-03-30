@@ -13,10 +13,14 @@ class ConnectivityProvider with ChangeNotifier {
   ConnectivityProvider() {
     // Initialise en écoutant les changements de connectivité.
     Connectivity().onConnectivityChanged.listen((result) {
-      bool nowConnected = result != ConnectivityResult.none;
-      if (_isConnected != nowConnected) {
-        _isConnected = nowConnected;
+      if (result == ConnectivityResult.none) {
+        _isConnected = false;
         notifyListeners();
+      } else {
+        _connectivityService.checkConnection().then((isConnected) {
+          _isConnected = isConnected;
+          notifyListeners();
+        });
       }
     });
   }
