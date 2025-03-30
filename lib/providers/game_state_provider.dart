@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:untitled/models/card_model.dart';
+import 'package:untitled/services/response_service.dart';
 import '../services/game_flow_service.dart';
 
 /// Provider qui expose l'etat du jeu en cours.
@@ -29,6 +31,21 @@ class GameStateProvider extends ChangeNotifier {
     required this.gameFlowService,
   }) {
     _listenGameFlow();
+  }
+
+  /// Soumet la reponse de l'utilisateur.
+  /// [responseText] est l'index de la reponse choisie par l'utilisateur.
+  /// [currentCard] est l'index de la solution stocke dans la carte (champ answer).
+  void submitResponse(int responseId, CardModel currentCard) {
+   final isCorrect = ResponseService().evaluateResponse(
+     responseId,
+     currentCard.answer,
+   );
+
+   if (isCorrect) {
+     _currentCardIndex++;
+     gameFlowService.updatePlayerScore(gameFlowService.localPlayerId);
+   }
   }
 
   void _listenGameFlow() async {

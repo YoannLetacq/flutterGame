@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/helpers/realtime_db_helper.dart';
+import 'package:untitled/providers/connectivity_provider.dart';
+import 'package:untitled/services/response_service.dart';
 import 'timer_service.dart';
 import 'game_progress_service.dart';
 import 'abandon_service.dart';
@@ -27,6 +29,9 @@ class GameFlowService {
 
   int currentCardIndex = 0;
   bool isGameEnded = false;
+
+  // initialise connectivity provider to get the status of the connection
+  final ConnectivityProvider connectivityProvider = ConnectivityProvider();
 
   GameFlowService({
     required this.timerService,
@@ -63,7 +68,16 @@ class GameFlowService {
         },
       );
       // Mettre a  joueur l'etat du local
-      updatePlayerState(playerId);
+      updatePlayerScore(playerId);
+      updatePlayerOnlineStatus(playerId);
+      updatePlayerStatus(playerId);
+      updatePlayerCardIndex(playerId);
+      updateElapsedTime(playerId);
+
+
+      if (kDebugMode) {
+        print('État du joueur local mis à jour dans la DB.');
+      }
     } catch (e, stackTrace) {
       if (kDebugMode) {
         print('Erreur lors du démarrage du chronomètre: $e');
@@ -73,25 +87,122 @@ class GameFlowService {
     }
   }
 
-  /// Met à jour l'état du joueur [playerId] dans la partie (par ex. score, index courant, statut) dans la DB Realtime.
-  Future<void> updatePlayerState(String playerId) async {
+  /// Met à jour le statut en ligne du joueur dans la RTDB.
+  /// /// [game] est l'objet de la partie en cours.
+  /// /// [playerId] est l'identifiant du joueur local.
+  /// /// [isOnline] est le statut à mettre à jour.
+  /// [connectivityProvider] est le provider de connectivité réseau.
+  /// Il donne isConnected qui indique si le joueur local a connection active..
+  Future<void> updatePlayerOnlineStatus(String playerId) async {
     try {
-      await RealtimeDBHelper.updateData('games/${game.id}/players/$playerId',
-        {
-        'currentCardIndex': currentCardIndex,
-        'score': 0,    // initialisé à 0 au départ
-        'status': 'in game',
-      });
+      // Mettre à jour le statut en ligne dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$playerId',
+        {'isOnline': connectivityProvider.isConnected},
+      );
       if (kDebugMode) {
-        print("État du joueur $playerId mis à jour dans la DB.");
+        print("Statut en ligne mis à jour pour le joueur $playerId.");
       }
     } catch (e, stackTrace) {
       if (kDebugMode) {
-        print("Erreur lors de la mise à jour de l'état du joueur: $e");
+        print("Erreur lors de la mise à jour du statut en ligne: $e");
         print(stackTrace);
       }
       rethrow;
     }
+  }
+
+  /// Met à jour le temps écoulé dans la RTDB.
+  /// [game] est l'objet de la partie en cours.
+  /// [playerId] est l'identifiant du joueur local.
+  /// [elapsedTime] est le temps écoulé à mettre à jour.
+ Future<void> updateElapsedTime(String playerId) async {
+    try {
+      // Mettre a jour le temps ecoule dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$playerId',
+        {'elapsedTime': TimerService().elapsedSeconds },
+      );
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print("Erreur lors de la mise à jour du temps écoulé: $e");
+        print(stackTrace);
+      }
+      rethrow;
+    }
+ }
+
+
+  /// Met à jour l'index de la carte du joueur dans la RTDB.
+  /// [game] est l'objet de la partie en cours.
+  /// [playerId] est l'identifiant du joueur local.
+  /// [currentCardIndex] est l'index de la carte à mettre à jour.
+  Future<void> updatePlayerCardIndex(String playerId) async {
+    try {
+      // Mettre à jour l'index de la carte du joueur dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$playerId',
+        {'currentCardIndex': currentCardIndex},
+      );
+      if (kDebugMode) {
+        print("Index de la carte mis à jour pour le joueur $playerId.");
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print("Erreur lors de la mise à jour de l'index de la carte: $e");
+        print(stackTrace);
+      }
+      rethrow;
+    }
+  }
+
+  /// Met à jour le status du joueur dans la RTDB.
+  /// [game] est l'objet de la partie en cours.
+  /// [player] est l'identifiant du joueur local.
+  /// [status] est le statut à mettre à jour.
+ Future<void> updatePlayerStatus(String player) async {
+    try {
+      // Mettre à jour le statut du joueur dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$player',
+        {'status': 'in game'},
+      );
+      if (kDebugMode) {
+        print("Statut du joueur $player mis à jour.");
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print("Erreur lors de la mise à jour du statut du joueur: $e");
+        print(stackTrace);
+      }
+      rethrow;
+    }
+  }
+
+  /// Met a jour le score du joueur dans la RTDB.
+  /// [game] est l'objet de la partie en cours.
+  /// [playerId] est l'identifiant du joueur local.
+  /// [score] est le score à mettre à jour.
+  Future<void> updatePlayerScore(String playerId) async {
+    try {
+      final int score = ResponseService().answerCount;
+      // Mettre à jour le score dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$playerId',
+        {'score': score},
+      );
+      if (kDebugMode) {
+        print("Score mis à jour: $score");
+      }
+    } catch (e, stackTrace) {
+        if (kDebugMode) {
+          print("Erreur lors de la mise à jour du score: $e");
+          print(stackTrace);
+        }
+        rethrow;
+    }
+
+
   }
 
   /// Termine la partie pour le joueur [playerId] : arrête le chronomètre et met à jour son statut dans la DB.
@@ -108,6 +219,29 @@ class GameFlowService {
     } catch (e, stackTrace) {
       if (kDebugMode) {
         print("Erreur lors de l'arrêt du chronomètre: $e");
+        print(stackTrace);
+      }
+      rethrow;
+    }
+  }
+
+  /// Met à jour le résultat du joueur dans la RTDB.
+  /// [game] est l'objet de la partie en cours.
+  /// [playerId] est l'identifiant du joueur local.
+  /// [gameResult] est le résultat à mettre à jour.
+  Future<void> updateGameResult(String playerId, String gameResult) async {
+    try {
+      // Mettre à jour le résultat du joueur dans la DB
+      RealtimeDBHelper.updateData(
+        'games/${game.id}/players/$playerId',
+        {'gameResult': gameResult},
+      );
+      if (kDebugMode) {
+        print("Résultat du joueur $playerId mis à jour: $gameResult");
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print("Erreur lors de la mise à jour du résultat du joueur: $e");
         print(stackTrace);
       }
       rethrow;
