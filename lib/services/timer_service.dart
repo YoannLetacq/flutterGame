@@ -7,7 +7,6 @@ import 'dart:async';
 class TimerService {
   Timer? _timer;
   int _elapsedSeconds = 0;
-
   /// Démarre le chronomètre.
   /// [onTick] est appelé chaque seconde avec le nombre total de secondes écoulées.
   /// [onSpeedUp] est appelé lorsque 300 secondes (5 minutes) se sont écoulées, pour indiquer une accélération de jeu.
@@ -33,5 +32,5 @@ class TimerService {
   }
 
   /// Retourne le nombre de secondes écoulées depuis le démarrage.
-  int get elapsedSeconds => _elapsedSeconds;
+  int? get elapsedSeconds => _elapsedSeconds;
 }
