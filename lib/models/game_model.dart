@@ -31,13 +31,22 @@ class GameModel {
   factory GameModel.fromJson(Map<String, dynamic> json) {
     return GameModel(
       id: json['id'] as String,
-      cards: (json['cards'] as List<dynamic>).map((e) => CardModel.fromJson(e)).toList(),
-      mode: (json['mode'] as String).toUpperCase() == "CLASSEE" ? GameMode.CLASSEE : GameMode.CLASSIQUE,
-      players: (json['players'] as Map<String, dynamic>).map(
-            (key, value) => MapEntry(key, PlayerModel.fromJson(value)),
+      cards: (json['cards'] as List).map((e) =>
+          CardModel.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+      mode: (json['mode'] as String).toUpperCase() == "CLASSEE"
+          ? GameMode.CLASSEE
+          : GameMode.CLASSIQUE,
+      players: Map<String, PlayerModel>.fromEntries(
+        (json['players'] as Map).entries.map(
+              (entry) => MapEntry(
+            entry.key.toString(),
+            PlayerModel.fromJson(Map<String, dynamic>.from(entry.value as Map)),
+          ),
+        ),
       ),
     );
   }
+
 
   /// Convertit l'instance en Map pour stockage dans Firebase.
   Map<String, dynamic> toJson() {
