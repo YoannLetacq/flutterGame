@@ -1,22 +1,38 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 class RealtimeDBHelper {
-  static final FirebaseDatabase _db = FirebaseDatabase.instance;
+  static final FirebaseDatabase _db = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: 'https://game-76a82-default-rtdb.europe-west1.firebasedatabase.app',
+  );
 
-  /// set ou create data
+  /// Convert any value to Map if possible
+  static Map<String, dynamic> _normalize(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    } else if (value != null && value.toJson is Function) {
+      return value.toJson() as Map<String, dynamic>;
+    } else {
+      throw ArgumentError('Value must be a Map<String, dynamic> or have a toJson() method');
+    }
+  }
+
+  /// set or create data
   static Future<void> setData(String path, dynamic value) async {
-   try {
-     await _db.ref(path).set(value);
-     if (kDebugMode) {
+    try {
+      final data = _normalize(value);
+      await _db.ref(path).set(data);
+      if (kDebugMode) {
         print('Data set: $path');
-     }
-   } catch (e) {
+      }
+    } catch (e) {
       if (kDebugMode) {
         print('Error setting data: $e');
       }
       rethrow;
-   }
+    }
   }
 
   /// get data once
@@ -32,11 +48,12 @@ class RealtimeDBHelper {
   }
 
   /// update data
-  static Future<void> updateData(String  path, Map<String, dynamic> updates) async {
+  static Future<void> updateData(String path, dynamic updates) async {
     try {
-      await _db.ref(path).update(updates);
+      final data = _normalize(updates);
+      await _db.ref(path).update(data);
       if (kDebugMode) {
-        print('Data updated at $path => $updates');
+        print('Data updated at $path => $data');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -86,7 +103,7 @@ class RealtimeDBHelper {
   }
 
   /// push data
-  static Future<DatabaseReference> push(String path) async{
+  static Future<DatabaseReference> push(String path) async {
     try {
       return _db.ref(path).push();
     } catch (e) {
@@ -96,5 +113,4 @@ class RealtimeDBHelper {
       rethrow;
     }
   }
-
 }

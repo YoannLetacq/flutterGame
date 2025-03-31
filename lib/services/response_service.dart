@@ -1,32 +1,9 @@
-import 'package:untitled/helpers/firestore_helper.dart';
-
-/// Évalue la réponse de l'utilisateur.
-///
-/// [userResponseIndex] est l'index de l'option choisie par l'utilisateur.
-/// [expectedIndex] est l'index correct stocké dans la carte (champ answer).
-/// Retourne true si les indices correspondent, sinon false.
+/// Service d'évaluation de réponses.
+/// - Rôle : vérifier si la réponse du joueur correspond à la réponse attendue.
 class ResponseService {
-  int answerCount = 0;
-  int? get score => answerCount;
-
-  /// Évalue la réponse de l'utilisateur par rapport à la réponse attendue.
+  /// Vérifie si l'indice [userResponseIndex] correspond à la bonne réponse [expectedIndex].
+  /// Retourne true si c'est correct, sinon false.
   bool evaluateResponse(int userResponseIndex, int expectedIndex) {
-    if (userResponseIndex == expectedIndex) {
-      answerCount++;
-      return true;
-    }
-    return false;
-
-  }
-
-/// Recupere la reponse dans la database.
-  /// answer est l'index de la bonne reponse parmis options.
-  Future<int> getAnswerFromDB(String collection, String docId, String field) async {
-    final answer = await FirestoreHelper.getField(
-        collection: collection,
-        docId: docId,
-        field: field
-    );
-    return answer as int;
+    return userResponseIndex == expectedIndex;
   }
 }

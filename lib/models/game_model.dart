@@ -43,7 +43,7 @@ class GameModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'cards': cards,
+      'cards': cards.map((card) => card.toJson()).toList(),
       'mode': mode == GameMode.CLASSEE ? "CLASSEE" : "CLASSIQUE",
       'players': players.map((key, value) => MapEntry(key, value.toJson())),
     };

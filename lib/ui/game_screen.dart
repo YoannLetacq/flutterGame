@@ -1,189 +1,247 @@
-import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:untitled/models/game_model.dart';
+import 'package:untitled/providers/game_state_provider.dart';
+import 'package:untitled/services/abandon_service.dart';
+import 'package:untitled/services/history_service.dart';
+import 'package:untitled/ui/result_screen.dart';
 import 'package:untitled/ui/widgets/animated_card_display.dart';
 import 'package:untitled/ui/widgets/card_response_widget.dart';
 import 'package:untitled/ui/widgets/opponent_progress_bar_widget.dart';
 import 'package:untitled/ui/widgets/player_progress_bar_widget.dart';
-import '../../models/game_model.dart';
-import '../../services/game_flow_service.dart';
-import '../../services/timer_service.dart';
-import '../../services/game_progress_service.dart';
-import '../../services/abandon_service.dart';
-import '../../services/elo_service.dart';
-import 'result_screen.dart';
 
 /// Écran principal de la partie.
-/// - Affiche la carte courante, la progression de chaque joueur et le timer de la partie.
-/// - Gère la logique de fin de partie : fin automatique quand les deux joueurs ont fini leurs cartes, ou abandon.
-/// - Intègre l'animation latérale de changement de carte via [AnimatedCardDisplay].
+/// - Gère le chronomètre (5min + speed-up 1min), l'abandon, et la fin de partie.
+/// - Toute la logique de fin (mise à jour DB, enregistrement historique) est déléguée à [GameFlowService.finalizeMatch].
+/// - À la fin, on navigue vers un [ResultScreen].
 class GameScreen extends StatefulWidget {
   final GameModel game;
+
   const GameScreen({super.key, required this.game});
 
   @override
-  _GameScreenState createState() => _GameScreenState();
+  State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late GameFlowService _gameFlow;
-  late String _playerId;
-  late String _opponentId;
-  int _elapsedTime = 0;
+  bool _showWaitingModal = false;
+  bool _forceEndTriggered = false;
 
   @override
   void initState() {
     super.initState();
-    // Suppose that the first player in the map is the local player (in a real scenario, identify via Auth)
-    _playerId = widget.game.players.keys.first;
-    _opponentId = widget.game.players.keys.last;
-    // Initialize GameFlowService with necessary services from providers
-    final timerService = Provider.of<TimerService>(context, listen: false);
-    final progressService = Provider.of<GameProgressService>(context, listen: false);
-    final abandonService = Provider.of<AbandonService>(context, listen: false);
-    final eloService = Provider.of<EloService>(context, listen: false);
-    final gameRef = FirebaseDatabase.instance.ref('games/${widget.game.id}');
-    _gameFlow = GameFlowService(
-      timerService: timerService,
-      progressService: progressService,
-      abandonService: abandonService,
-      eloService: eloService,
-      game: widget.game,
-      gameRef: gameRef,
-    );
-    // Start the game timer and logic
-    _gameFlow.startGame(
-      playerId: _playerId,
-      onTick: (seconds) {
-        setState(() => _elapsedTime = seconds);
-      },
+    final provider = context.read<GameStateProvider>();
+
+    // Démarre le timer + maj DB init
+    provider.gameFlowService.startGame(
+      onTick: (sec) => provider.updateElapsedTime(sec),
       onSpeedUp: () {
-        // Activate speed-up mode after 5 minutes
-        if (kDebugMode) {
-          print('Mode speed-up activé (5 minutes écoulées)');
+        // Appelé après 5 minutes
+        if (mounted) {
+          setState(() {
+            // On pourrait afficher "Mode speed-up activé" ou autre.
+          });
         }
-
-
       },
-    );
-    // Écoute l'état global du jeu pour détecter la fin de partie (deux joueurs finis)
-    _gameFlow.listenGameState().listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null && mounted) {
-        final playersData = data['players'] as Map?;
-        if (playersData != null) {
-          final statusPlayer = playersData[_playerId]['status'];
-          final statusOpponent = playersData[_opponentId]['status'];
-          if (statusPlayer == 'finished' && statusOpponent == 'finished') {
-            // Les deux joueurs ont terminé leurs cartes -> fin de partie
-            _onGameFinished();
-          } else if (statusPlayer == 'finished' && statusOpponent == 'abandon') {
-            // L'adversaire a abandonné -> victoire du joueur courant
-            _onGameFinished(abandonWin: true);
-          } else if (statusPlayer == 'abandon' && statusOpponent == 'finished') {
-            // Le joueur courant a abandonné -> défaite
-            _onGameFinished(abandonWin: false);
-          }
+      onForcedEnd: () {
+        // Appelé après 6 minutes
+        if (!_forceEndTriggered && mounted) {
+          _forceEndTriggered = true;
+          _onGameFinished();
         }
-      }
-    });
+      },
+      playerId: provider.gameFlowService.localPlayerId,
+    );
   }
 
-  void _onGameFinished({bool? abandonWin}) {
-    // Arrête le GameFlow et passe à l'écran de résultats
-    _gameFlow.endGame(_playerId);
-    // Détermine le résultat pour l'écran des scores
-    bool playerWon;
-    if (abandonWin != null) {
-      playerWon = abandonWin; // victoire ou défaite suite à un abandon
-    } else {
-      // Comparer les scores si pas d'abandon
-      final playerScore = widget.game.players[_playerId]?.score ?? 0;
-      final opponentScore = widget.game.players[_opponentId]?.score ?? 0;
-      playerWon = playerScore >= opponentScore;
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<GameStateProvider>();
+
+    // Si le joueur a terminé toutes ses cartes avant l'adversaire, on affiche un modal d'attente.
+    if (provider.currentCardIndex >= provider.totalCards && !_showWaitingModal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showWaitingModal = true;
+        _showWaitingDialog();
+      });
     }
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResultScreen(
-          playerWon: playerWon,
-          playerScore: widget.game.players[_playerId]?.score ?? 0,
-          opponentScore: widget.game.players[_opponentId]?.score ?? 0,
-          wasRanked: widget.game.mode == GameMode.CLASSEE,
-          opponentId: _opponentId,
+
+    // Récupération de l'index adversaire (si on le stocke dans widget.game ou via la DB)
+    final opponentId = provider.gameFlowService.opponentPlayerId;
+    final opponentIndex = widget.game.players[opponentId]?.currentCardIndex ?? 0;
+
+    return WillPopScope(
+      onWillPop: _onWillPop, // Intercepter le bouton "retour" hardware
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Game ${widget.game.id}'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => _confirmAbandon(), // Evenement "retour" flèche AppBar
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.flag),
+              tooltip: 'Abandonner',
+              onPressed: () => _confirmAbandon(), // Evenement "Abandon"
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Timer
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'Temps écoulé : ${provider.elapsedTime} sec',
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+
+            // Barre de progression (joueur local + adversaire)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PlayerProgressBarWidget(
+                      currentIndex: provider.currentCardIndex,
+                      totalCards: provider.totalCards,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OpponentProgressBarWidget(
+                      currentIndex: opponentIndex,
+                      totalCards: provider.totalCards,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Carte courante (animation latérale)
+            Expanded(
+              child: AnimatedCardDisplay(cardModel: provider.currentCard),
+            ),
+
+            // Zone de réponse : on renvoie l'index de l'option choisie au provider
+            CardResponseWidget(
+              card: provider.currentCard,
+              onAnswer: (chosenIndex) => provider.submitResponse(chosenIndex),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  @override
-  void dispose() {
-    // Arrête le timer si l'écran se ferme (par précaution)
-    if (!_gameFlow.isGameEnded) {
-      _gameFlow.timerService.stopTimer();
-    }
-    super.dispose();
+  /// Intercepte le retour hardware
+  Future<bool> _onWillPop() async {
+    return _confirmAbandon(); // Même logique que la flèche AppBar
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final currentCardId = widget.game.cards.isNotEmpty
-        ? widget.game.cards[_gameFlow.currentCardIndex]
-        : null;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Game ${widget.game.id}'),
+  /// Demande confirmation d'abandon
+  Future<bool> _confirmAbandon() async {
+    final abandonService = context.read<AbandonService>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Quitter la partie ?'),
+        content: const Text('Voulez-vous vraiment quitter la partie en cours ?'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flag),
-            tooltip: 'Abandonner',
-            onPressed: () {
-              // Le joueur abandonne volontairement la partie
-              _gameFlow.gameRef.child('players').child(_playerId).update({'status': 'abandon'});
-            },
-          )
+          TextButton(
+            child: const Text('Non'),
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          TextButton(
+            child: const Text('Oui'),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          // Timer display
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Temps écoulé: $_elapsedTime sec',
-              style: const TextStyle(fontSize: 18),
-            ),
+    ) ?? false;
+
+    if (abandonService.isAbandonedByModal(confirm)) {
+      // Abandon confirmé => on traite la fin de partie côté service.
+      _finalizeMatch(isAbandon: true);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /// Appelé quand on dépasse 6 minutes (timer expiré) OU si les deux joueurs ont fini
+  /// OU en cas d'abandon => On finalise la partie
+  void _onGameFinished() {
+    _finalizeMatch(isAbandon: false);
+  }
+
+  /// Méthode commune pour finaliser la partie (abandon ou fin de timer)
+  void _finalizeMatch({required bool isAbandon}) async {
+    final provider = context.read<GameStateProvider>();
+    final historyService = context.read<HistoryService>();
+
+    // Mettre éventuellement local status = "abandon" si isAbandon
+    if (isAbandon) {
+      await provider.gameFlowService.updatePlayerStatus(
+        provider.gameFlowService.localPlayerId,
+        'abandon',
+      );
+    }
+
+    // Récupération score local / adversaire
+    final localScore = provider.score;
+    final opponentScore = _fetchOpponentScore(); // ex. depuis widget.game
+
+    // On appelle finalizeMatch dans GameFlowService
+    final success = await provider.gameFlowService.finalizeMatch(
+      localScore: localScore,
+      opponentScore: opponentScore,
+      localPlayerId: provider.gameFlowService.localPlayerId,
+      opponentPlayerId: provider.gameFlowService.opponentPlayerId,
+      wasRanked: false,            // ou true si partie classée
+      historyService: historyService,
+    );
+
+    if (!mounted) return;
+    if (success) {
+      // On détermine si le joueur local a gagné
+      final playerWon = localScore > opponentScore;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultScreen(
+            playerWon: playerWon,
+            playerScore: localScore,
+            opponentScore: opponentScore,
+            wasRanked: false,
+            opponentId: provider.gameFlowService.opponentPlayerId,
           ),
-          // Progress bars for both players
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Expanded(child: PlayerProgressBarWidget(currentIndex: _gameFlow.currentCardIndex, totalCards: widget.game.cards.length)),
-                const SizedBox(width: 10),
-                Expanded(child: OpponentProgressBarWidget(currentIndex: widget.game.players[_opponentId]?.currentCardIndex ?? 0, totalCards: widget.game.cards.length)),
-              ],
-            ),
-          ),
-          // Current card display with lateral slide animation
-          Expanded(
-            child: AnimatedCardDisplay(cardId: currentCardId),
-          ),
-          // Zone de réponse du joueur (ex: boutons ou champ texte), via un widget dédié:
-          CardResponseWidget(
-            cardId: currentCardId,
-            onAnswer: (String answer) {
-              // Traitement de la réponse du joueur (vérification via ResponseService, mise à jour du score)
-              // Incrémente la progression si réponse donnée
-              setState(() {
-                _gameFlow.currentCardIndex = _gameFlow.progressService.incrementCardIndex(_gameFlow.currentCardIndex, widget.game.cards.length);
-              });
-              // Met à jour l'état du joueur en DB (nouvel index, score éventuel)
-              _gameFlow.updatePlayerState(_playerId);
-            },
-          ),
-        ],
+        ),
+      );
+    } else {
+      // En cas d'erreur, on peut afficher un message
+      Navigator.pop(context);
+    }
+  }
+
+  /// Exemple pour récupérer le score adverse (selon ta logique DB)
+  int _fetchOpponentScore() {
+    final oppId = context.read<GameStateProvider>().gameFlowService.opponentPlayerId;
+    final oppPlayer = widget.game.players[oppId];
+    return oppPlayer?.score ?? 0;
+  }
+
+  /// Simple modal d'attente pour le joueur qui a fini avant l'adversaire
+  void _showWaitingDialog() {
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (ctx) => const AlertDialog(
+        title: Text('En attente...'),
+        content: Text('Vous avez terminé vos cartes. En attente de l\'adversaire...'),
+        actions: [],
       ),
     );
   }

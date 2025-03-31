@@ -27,12 +27,12 @@ class CardService {
   /// Cree deux listes de 20 cartes aléatoires a distribuer aux joueurs
   List<List<CardModel>> dealCards(List<CardModel> cards) {
     // si moins de 40 cartes, on renvoie une exeception
-    if (cards.length < 40) {
+    if (cards.length < 20) {
       throw Exception('Pas assez de cartes pour distribuer');
     }
     final shuffledCards = cards..shuffle();
-    final firstHalf = shuffledCards.sublist(0, 20);
-    final secondHalf = shuffledCards.sublist(20, 40);
+    final firstHalf = shuffledCards.sublist(0, 10);
+    final secondHalf = shuffledCards.sublist(10, 20);
     return [firstHalf, secondHalf];
   }
 }

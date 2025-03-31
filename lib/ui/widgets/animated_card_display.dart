@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/models/card_model.dart';
 
-/// Widget d'affichage animé de la carte de jeu courante.
-/// - Rôle : afficher la carte actuelle avec une transition en slide à chaque changement de carte.
-/// - Dépendances : aucune (affichage pur, la nouvelle carte est fournie via [cardId] qui déclenche le changement).
-/// - Retourne l'affichage de la carte (placeholder si [cardId] est null).
+/// Affiche la carte courante avec animation en slide.
+/// On affiche soit le champ "name" (si type = definition),
+/// soit le champ "definition" (si type = complement).
 class AnimatedCardDisplay extends StatelessWidget {
-  final String? cardId;
-  const AnimatedCardDisplay({super.key, required this.cardId});
+  final CardModel? cardModel; // null => en attente
+
+  const AnimatedCardDisplay({super.key, required this.cardModel});
 
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
       transitionBuilder: (child, animation) {
-        // Transition en slide horizontale
         final offsetAnimation = Tween<Offset>(
-          begin: const Offset(1.0, 0.0), // slide in from right
+          begin: const Offset(1.0, 0.0),
           end: Offset.zero,
         ).animate(animation);
         return ClipRect(
-          child: SlideTransition(position: offsetAnimation, child: child),
+          child: SlideTransition(
+            position: offsetAnimation,
+            child: child,
+          ),
         );
       },
-      child: cardId == null
+      child: cardModel == null
           ? Container(
         key: const ValueKey('empty'),
         alignment: Alignment.center,
@@ -31,20 +34,28 @@ class AnimatedCardDisplay extends StatelessWidget {
           style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
         ),
       )
-          : _buildCardWidget(cardId!, key: ValueKey(cardId)),
+          : _buildCardWidget(cardModel!, key: ValueKey(cardModel!.id)),
     );
   }
 
-  Widget _buildCardWidget(String cardId, {Key? key}) {
-    // Pour simplifier, on affiche juste l'ID de la carte.
-    // Dans une vraie application, on afficherait question, image, etc. en fonction de cardId.
+  Widget _buildCardWidget(CardModel card, {Key? key}) {
+    // Selon le type
+    final displayText = (card.type == 'definition')
+        ? card.name
+        : card.definition.isNotEmpty
+        ? card.definition
+        : card.name; // fallback
+
     return Container(
       key: key,
       margin: const EdgeInsets.all(16.0),
       padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8.0)),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8.0),
+      ),
       child: Text(
-        'Carte: $cardId',
+        displayText,
         style: const TextStyle(fontSize: 22),
       ),
     );

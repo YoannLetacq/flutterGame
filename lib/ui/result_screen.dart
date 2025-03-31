@@ -8,12 +8,10 @@ import 'home_screen.dart';
 
 /// Écran de résultats de la partie.
 ///
-/// Affiche le score final et indique le gagnant.
-/// Comprend un compteur de score animé qui se met à jour jusqu'au score final.
-/// Si la partie était classée, calcule l'Elo gagné/perdu et met à jour le classement dans Firestore.
-///
-/// Dépendances : RankingService et HistoryService (via Provider) pour le calcul de l'Elo et l'enregistrement de l'historique.
-/// AuthService est utilisé pour récupérer l'UID du joueur actuel.
+/// - Affiche le score final, la victoire ou la défaite.
+/// - Anime le compteur de score jusqu’au score final.
+/// - Si la partie était classée (wasRanked), met à jour le classement Elo via [RankingService],
+///   et enregistre l'historique via [HistoryService].
 class ResultScreen extends StatefulWidget {
   final bool playerWon;
   final int playerScore;
@@ -34,7 +32,8 @@ class ResultScreen extends StatefulWidget {
   _ResultScreenState createState() => _ResultScreenState();
 }
 
-class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderStateMixin {
+class _ResultScreenState extends State<ResultScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<int> _scoreAnimation;
   int _displayedScore = 0;
@@ -42,9 +41,14 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    // Animation du compteur de score de 0 jusqu'au score du joueur
-    _animController = AnimationController(duration: const Duration(seconds: 2), vsync: this);
-    _scoreAnimation = IntTween(begin: 0, end: widget.playerScore).animate(_animController)
+    // Animation du score du joueur local
+    _animController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+
+    _scoreAnimation =
+    IntTween(begin: 0, end: widget.playerScore).animate(_animController)
       ..addListener(() {
         setState(() {
           _displayedScore = _scoreAnimation.value;
@@ -52,25 +56,28 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
       });
     _animController.forward();
 
-    // Si la partie était classée, mettre à jour l'Elo et enregistrer l'historique
+    // Gestion du ranking/historique si partie classée
     if (widget.wasRanked) {
-      // Récupérer l'UID du joueur courant via AuthService
       final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.currentUser;
       if (user != null) {
-        final String userId = user.uid;
+        final userId = user.uid;
         final rankingService = Provider.of<RankingService>(context, listen: false);
         final historyService = Provider.of<HistoryService>(context, listen: false);
-        double playerResultScore = widget.playerWon ? 1.0 : 0.0;
-        double opponentResultScore = widget.playerWon ? 0.0 : 1.0;
-        // Met à jour le classement Elo des deux joueurs dans Firestore.
+
+        // Dans la logique Elo, 1.0 = victoire, 0.0 = défaite
+        final playerEloScore = widget.playerWon ? 1.0 : 0.0;
+        final opponentEloScore = widget.playerWon ? 0.0 : 1.0;
+
+        // Met à jour le classement du joueur local + adversaire
         rankingService.updateEloAfterGame(
           playerId: userId,
           opponentId: widget.opponentId,
-          playerScore: playerResultScore,
-          opponentScore: opponentResultScore,
+          playerScore: playerEloScore,
+          opponentScore: opponentEloScore,
         );
-        // Enregistre l'historique de la partie pour l'utilisateur courant.
+
+        // Enregistre l'historique de la partie pour le joueur local
         historyService.recordGameHistory(userId, {
           'date': DateTime.now(),
           'score': widget.playerScore,
@@ -80,7 +87,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
         });
       } else {
         if (kDebugMode) {
-          print("Aucun utilisateur connecté. Impossible de mettre à jour le classement Elo.");
+          print("Aucun utilisateur connecté -> impossible de mettre à jour l'Elo.");
         }
       }
     }
@@ -94,7 +101,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    String resultText = widget.playerWon ? 'Victoire !' : 'Défaite';
+    final resultText = widget.playerWon ? 'Victoire !' : 'Défaite';
     return Scaffold(
       appBar: AppBar(title: const Text('Résultat')),
       body: Center(
@@ -125,6 +132,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             ElevatedButton(
               child: const Text('Retour à l\'accueil'),
               onPressed: () {
+                // Retour forcé à l'écran Home
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const HomeScreen()),

@@ -21,7 +21,7 @@ class OpponentProgressBarWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         const Text('Adversaire', style: TextStyle(fontWeight: FontWeight.bold)),
-        LinearProgressIndicator(value: progress, minHeight: 8, color: Colors.redAccent),
+        LinearProgressIndicator(value: progress, minHeight: 8),
         const SizedBox(height: 4),
         Text('${(progress * 100).toStringAsFixed(0)}%'),
       ],

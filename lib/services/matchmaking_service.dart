@@ -20,95 +20,119 @@ class MatchmakingService with ChangeNotifier {
   /// Sinon, place le joueur dans la file d'attente et retourne null.
   Future<GameModel?> findMatch(String userId, GameMode mode) async {
     final String modeKey = mode == GameMode.CLASSEE ? 'ranked' : 'casual';
-    final String waitingRef = 'matchmaking/$modeKey/waiting';
+    final String waitingRefPath = 'matchmaking/$modeKey/waiting';
 
-    // On tente une transaction pour verifer si un joueur est déjà en attente
+    // Variable locale où on stocke l'ID de l'adversaire si trouvé
+    String? foundOpponentId;
+
+    // On exécute la transaction
     TransactionResult transactionResult = await RealtimeDBHelper.runTransaction(
-      waitingRef,
-        (currentData) {
-          if (currentData == null) {
-            // Pas de joueur en attente, on place le joueur actuel en attente
-            return Transaction.success(userId);
-          } else {
-            // un joueur est déjà en attente
-            final existingUser = currentData as String?;
-            if (existingUser == userId) {
-              // match sois même, stop la transaction
-              if (kDebugMode) {
-                print('[MatchmakingService] Player $userId is already waiting');
-              }
-              return Transaction.abort();
-            } else {
-              // Adversaire trouvé -> on retire la file d'attente
-              if (kDebugMode) {
-                print('[MatchmakingService] Player $userId found opponent $existingUser');
-              }
-              return Transaction.success(null);
+      waitingRefPath,
+          (currentData) {
+        if (currentData == null) {
+          // Personne dans la file -> on place ce joueur
+          return Transaction.success(userId);
+        } else {
+          final existingUser = currentData as String?;
+          if (existingUser == userId) {
+            // Le joueur local est déjà en attente
+            if (kDebugMode) {
+              print('[MatchmakingService] Player $userId is already waiting');
             }
+            // On peut choisir de le laisser en attente (Transaction.success(userId)),
+            // ou de "nettoyer" la file (Transaction.success(null)).
+            return Transaction.abort();
+          } else {
+            // On a trouvé un adversaire distinct
+            foundOpponentId = existingUser; // on stocke son ID localement
+            if (kDebugMode) {
+              print('[MatchmakingService] Player $userId found opponent $existingUser');
+            }
+            // On retire la file d'attente en la passant à null
+            return Transaction.success(null);
           }
-        },
+        }
+      },
     );
 
     if (!transactionResult.committed) {
-      // transaction echouée
+      // La transaction a échoué ou a été abort
       if (kDebugMode) {
         print('[MatchmakingService] Transaction failed');
       }
       return null;
     }
 
-    // On regarde le snapshot final
-    DataSnapshot? snapshot = transactionResult.snapshot;
-    // si snap.value == userId, alors on est en attente
-    if (snapshot.value == userId) {
+    // Vérifions la valeur finale
+    final snapshotValue = transactionResult.snapshot.value;
+
+    // Si snapshotValue == userId => ce joueur vient d'être mis en attente
+    if (snapshotValue == userId) {
       if (kDebugMode) {
-        print('[MatchmakingService] Player $userId is waiting');
+        print('[MatchmakingService] Player $userId is now waiting');
+      }
+      // Pas d'adversaire pour l'instant, on retourne null => on signale "en attente"
+      return null;
+    }
+
+    // Sinon, on a potentiellement un adversaire => foundOpponentId
+    if (foundOpponentId == null) {
+      // Cas anormal : la transaction a mis waitingRef à null
+      // mais on n'a pas trouvé d'adversaire
+      if (kDebugMode) {
+        print('[MatchmakingService] Unexpected: foundOpponentId is null');
       }
       return null;
     }
 
-    // Adversaire trouvé
-    // On crée une nouvelle partie
-    final Future<DatabaseReference> newGameRef = RealtimeDBHelper.push('games');
-    final String newGameId = (await newGameRef).key!;
+    // À ce stade, foundOpponentId != null => on crée une partie
+    final newGameRef = await RealtimeDBHelper.push('games');
+    final String newGameId = newGameRef.key!;
 
     // on recupere la listes des cartes
     final List<List<CardModel>> cards = CardService().dealCards(await CardService().fetchCards());
 
     // on crée les deux joueurs
-    final PlayerModel player1 = PlayerModel(id: userId,
-        cardsOrder: cards[0].map((card) => card.id).toList(),
-        currentCardIndex: 0,
-        score: 0,
-        status: 'in game',
-        winner: null);
-
-    final PlayerModel player2 = PlayerModel(id: snapshot.value as String,
-        cardsOrder: cards[1].map((card) => card.id).toList(),
-        currentCardIndex: 0,
-        score: 0,
-        status: 'in game',
-        winner: null);
-
-    if (kDebugMode) {
-      print('[MatchmakingService] Players created: current : $userId, opponent : ${snapshot.value}');
-    }
-
-    // on construit la nouvelle partie
-    final GameModel newGame = GameModel(
-      players: {userId: player1, snapshot.value as String: player2},
-      cards: cards.expand((element) => element).toList(),
-      id: newGameId,
-      mode: mode
+    final PlayerModel player1 = PlayerModel(
+      id: userId,
+      cardsOrder: cards[0].map((card) => card.id).toList(),
+      currentCardIndex: 0,
+      score: 0,
+      status: 'in game',
+      winner: null,
     );
 
-    // Enregistre la nouvelle partie dans la Realtime Database
+    final PlayerModel player2 = PlayerModel(
+      id: foundOpponentId!,
+      cardsOrder: cards[1].map((card) => card.id).toList(),
+      currentCardIndex: 0,
+      score: 0,
+      status: 'in game',
+      winner: null,
+    );
+
+    if (kDebugMode) {
+      print('[MatchmakingService] Players created: $userId vs $foundOpponentId');
+    }
+
+    // On construit la nouvelle partie
+    final GameModel newGame = GameModel(
+      players: {userId: player1, foundOpponentId!: player2},
+      cards: cards.expand((element) => element).toList(),
+      id: newGameId,
+      mode: mode,
+    );
+
+    // On enregistre la partie en DB
     await RealtimeDBHelper.setData('games/$newGameId', newGame.toJson());
+
     if (kDebugMode) {
       print('[MatchmakingService] New game created: $newGameId');
     }
+
     return newGame;
   }
+
 
   StreamSubscription<DatabaseEvent>? _waitingSubscribtion;
   GameModel? _currentgame;
