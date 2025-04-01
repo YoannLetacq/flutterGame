@@ -1,35 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:untitled/ui/login_screen.dart';
 import '../../models/game_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/matchmaking_service.dart';
 import '../helpers/navigator_helper.dart';
+import 'home_screen.dart';
 
 /// Écran de matchmaking.
 /// - Met en attente le joueur et affiche un indicateur de recherche de joueur.
 /// - Lorsqu'un adversaire est trouvé, passe à l'écran de jeu correspondant en récupérant l'ID de la partie depuis Firebase Realtime Database.
-class MatchmakingScreen extends StatelessWidget {
+class MatchmakingScreen extends StatefulWidget {
   final bool isRanked;
 
   const MatchmakingScreen({super.key, required this.isRanked});
 
   @override
+  State<MatchmakingScreen> createState() => _MatchmakingScreenState();
+}
+
+class _MatchmakingScreenState extends State<MatchmakingScreen> {
+  late final MatchmakingService matchmakingService;
+  late final AuthService authService;
+
+  @override
+  void initState() {
+    super.initState();
+    matchmakingService = context.read<MatchmakingService>();
+    authService = context.read<AuthService>();
+
+    final user = authService.currentUser;
+    if (user != null) {
+      matchmakingService.startMatchMaking(
+        user.uid,
+        widget.isRanked ? GameMode.CLASSEE : GameMode.CLASSIQUE,
+      );
+    } else {
+      // Si l'utilisateur n'est pas connecté, on le redirige vers l'écran de connexion
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    final user = authService.currentUser;
+    if (user != null) {
+      matchmakingService.stopMatchmaking();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final matchmakingService = Provider.of<MatchmakingService>(context);
-    final user = Provider.of<AuthService>(context).currentUser;
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Matchmaking')),
-        body: const Center(child: Text('Erreur: Pas authentifié')),
-      );
-    }
-
-    // Lance le matchmaking si pas encore lancé
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!matchmakingService.isWaiting && matchmakingService.currentGame == null) {
-        matchmakingService.startMatchMaking(user.uid, isRanked ? GameMode.CLASSEE : GameMode.CLASSIQUE);
-      }
-    });
 
     // Si une partie est trouvée, on y navigue
     if (matchmakingService.currentGame != null) {
@@ -41,12 +69,15 @@ class MatchmakingScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: isRanked ? const Text('Matchmaking classé') : const Text('Matchmaking'),
+        title: widget.isRanked ? const Text('Matchmaking classé') : const Text('Matchmaking'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
             await matchmakingService.stopMatchmaking();
-            Navigator.pop(context);
+            if (context.mounted) {
+              // Retourne à l'écran précédent
+              Navigator.of(context).pop();
+            }
           },
         ),
       ),
@@ -62,7 +93,13 @@ class MatchmakingScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: () async {
                 await matchmakingService.stopMatchmaking();
-                Navigator.pop(context);
+                if (context.mounted)  {
+                  // navigue vers l'écran d'accueil
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                  );
+                }
               },
               child: const Text('Annuler la recherche'),
             ),
@@ -73,3 +110,4 @@ class MatchmakingScreen extends StatelessWidget {
     );
   }
 }
+
