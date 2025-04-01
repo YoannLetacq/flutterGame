@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/models/card_model.dart';
+import 'package:untitled/services/game_progress_service.dart';
 import 'package:untitled/services/response_service.dart';
+import 'package:untitled/services/timer_service.dart';
 import '../services/game_flow_service.dart';
-
-/// Provider qui expose l'etat du jeu en cours.
-/// Il ecoute le flux d'evenements via GameFlowService et notifie les listeners a chaque changement.
-/// met a jour l'etat du jeu en cours.
 
 class GameStateProvider extends ChangeNotifier {
   final GameFlowService gameFlowService;
+  final ResponseService responseService;
+  final TimerService timerService;
+  final GameProgressService gameProgressService;
+
+  /// Liste de toutes les cartes du jeu (fixée lors de l'init).
+  final List<CardModel> cards;
+
+  /// Nombre total de cartes
+  int get totalCards => cards.length;
+
+  int _score = 0;
+  int get score => _score;
 
   int _elapsedTime = 0;
   int get elapsedTime => _elapsedTime;
@@ -17,85 +27,105 @@ class GameStateProvider extends ChangeNotifier {
   int _currentCardIndex = 0;
   int get currentCardIndex => _currentCardIndex;
 
-  late String _playerStatus = "in game";
+  String _playerStatus = "in game";
   String get playerStatus => _playerStatus;
 
   bool? _gameResult;
   bool? get gameResult => _gameResult;
 
-  late bool _isOnline = true;
-  bool? get isOnline => _isOnline;
+  bool _isOnline = true;
+  bool get isOnline => _isOnline;
 
   late final Stream<DatabaseEvent> _gameStateStream;
+
   GameStateProvider({
     required this.gameFlowService,
+    required this.responseService,
+    required this.timerService,
+    required this.gameProgressService,
+    required this.cards,
   }) {
     _listenGameFlow();
   }
 
-  /// Soumet la reponse de l'utilisateur.
-  /// [responseText] est l'index de la reponse choisie par l'utilisateur.
-  /// [currentCard] est l'index de la solution stocke dans la carte (champ answer).
-  void submitResponse(int responseId, CardModel currentCard) {
-   final isCorrect = ResponseService().evaluateResponse(
-     responseId,
-     currentCard.answer,
-   );
+  /// Compare la réponse de l'utilisateur (index choisi) avec [currentCard.answer].
+  /// Si c'est correct, on incrémente le score et on passe à la carte suivante.
+  void submitResponse(int chosenIndex) {
+    if (_currentCardIndex >= totalCards) return;
+    final currentCard = cards[_currentCardIndex];
+    final isCorrect = responseService.evaluateResponse(chosenIndex, currentCard.answer);
 
-   if (isCorrect) {
-     _currentCardIndex++;
-     gameFlowService.updatePlayerScore(gameFlowService.localPlayerId);
-   }
+    if (isCorrect) {
+      _score++;
+      gameFlowService.updatePlayerScore(gameFlowService.localPlayerId, _score);
+    }
+    // Passage à la carte suivante
+    nextCard();
+
   }
 
+  /// Avance l'index de carte via [GameProgressService].
+  void nextCard() {
+    final newIndex = gameProgressService.incrementCardIndex(_currentCardIndex, totalCards);
+    if (newIndex != _currentCardIndex) {
+      gameFlowService.updatePlayerCardIndex(gameFlowService.localPlayerId, newIndex);
+    }
+  }
+
+  /// Écoute la DB, met à jour l'état local
   void _listenGameFlow() async {
     _gameStateStream = await gameFlowService.listenGameState();
     _gameStateStream.listen((event) {
-     final gameData = event.snapshot.value as Map?;
-     if (gameData != null) {
-       // Mise a jour de l'etat du joueur local
-       final playerData = (gameData['players'] as Map?)?.cast<String, dynamic>();
-       if (playerData != null) {
-         final localData = playerData[gameFlowService.localPlayerId] as Map?;
-         if (localData != null) {
-           // Mise a jour de l'etat local a partir de la DB
-           // Uniquement si lq valeur a change
-           int newCardIndex = localData['currentCardIndex'] ?? _currentCardIndex;
-           int newElapsedTime = localData['elapsedTime'] ?? _elapsedTime;
-           String newStatus = localData['status'] ?? _playerStatus;
-           bool newIsOnline = localData['isOnline'] ?? _isOnline;
-           bool newGameResult = localData['gameResult'] ?? _gameResult;
+      final gameData = event.snapshot.value as Map?;
+      if (gameData == null) return;
+      final playersData = gameData['players'] as Map?;
+      if (playersData == null) return;
 
-           bool hasChanged = newCardIndex != _currentCardIndex ||
-            newElapsedTime != _elapsedTime ||
-            newStatus != _playerStatus ||
-            newIsOnline != _isOnline ||
-            newGameResult != _gameResult;
+      final localData = playersData[gameFlowService.localPlayerId] as Map?;
+      if (localData == null) return;
 
-           if (hasChanged) {
-             _currentCardIndex = newCardIndex;
-             _elapsedTime = newElapsedTime;
-             _playerStatus = newStatus;
-             _isOnline = newIsOnline;
-             _gameResult = newGameResult;
-           }
+      final newIndex = localData['currentCardIndex'] ?? _currentCardIndex;
+      final newElapsed = localData['elapsedTime'] ?? _elapsedTime;
+      final newStatus = localData['status'] ?? _playerStatus;
+      final newIsOnline = localData['isOnline'] ?? _isOnline;
+      final newScore = localData['score'] ?? _score;
+      final newResult = localData['gameResult'] ?? _gameResult;
 
-         }
-       }
-       notifyListeners();
-     }
-       });
+      bool hasChanged = (newIndex != _currentCardIndex) ||
+          (newElapsed != _elapsedTime) ||
+          (newStatus != _playerStatus) ||
+          (newIsOnline != _isOnline) ||
+          (newScore != _score) ||
+          (newResult != _gameResult);
+
+      if (hasChanged) {
+        _currentCardIndex = newIndex;
+        _elapsedTime = newElapsed;
+        _playerStatus = newStatus;
+        _isOnline = newIsOnline;
+        _score = newScore;
+        _gameResult = newResult;
+        notifyListeners();
+      }
+    });
   }
 
-  /// Met a jour le temps ecoule et notifie l'UI.
-  void updateElapsedTime(int newElapsedTime) {
-    _elapsedTime = newElapsedTime;
+  /// Appelé chaque seconde par [GameScreen], on met à jour la DB + local.
+  void updateElapsedTime(int secs) {
+    _elapsedTime = secs;
+    gameFlowService.updateElapsedTime(gameFlowService.localPlayerId, secs);
     notifyListeners();
   }
 
-  /// Signale la fin de partie et enregistre le resultat.
-  void endGame(bool gameResult) {
-    _gameResult = gameResult;
+  /// Déclare la fin de partie, ex. on fait un booleen pour la victoire/défaite
+  void endGame(bool didWin) {
+    _gameResult = didWin;
     notifyListeners();
+    gameFlowService.endGame(gameFlowService.localPlayerId);
   }
+
+  /// Carte courante, ou null si on a dépassé la limite
+  CardModel? get currentCard =>
+      (_currentCardIndex < cards.length) ? cards[_currentCardIndex] : null;
 }
+
