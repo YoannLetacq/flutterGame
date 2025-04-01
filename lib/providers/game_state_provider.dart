@@ -69,6 +69,9 @@ class GameStateProvider extends ChangeNotifier {
     final newIndex = gameProgressService.incrementCardIndex(_currentCardIndex, totalCards);
     if (newIndex != _currentCardIndex) {
       gameFlowService.updatePlayerCardIndex(gameFlowService.localPlayerId, newIndex);
+      // On met à jour l'index local
+      _currentCardIndex = newIndex;
+      notifyListeners();
     }
   }
 
