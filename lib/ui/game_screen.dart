@@ -112,7 +112,7 @@ class _GameScreenState extends State<GameScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: OpponentProgressBarWidget(
-                      currentIndex: opponentIndex,
+                      currentIndex: provider.opponentCardIndex,
                       totalCards: provider.totalCards,
                     ),
                   ),
@@ -157,6 +157,7 @@ class _GameScreenState extends State<GameScreen> {
           TextButton(
             child: const Text('Oui'),
             onPressed: () => Navigator.pop(ctx, true),
+
           ),
         ],
       ),
