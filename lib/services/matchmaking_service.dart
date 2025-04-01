@@ -29,6 +29,7 @@ class MatchmakingService with ChangeNotifier {
     final String waitingPath = 'matchmaking/$modeKey/waiting';
     _currentWaitingPath = waitingPath;
 
+    if (kDebugMode) print('[MatchmakingService] Starting matchmaking for $userId');
     String? opponentId;
 
     final result = await RealtimeDBHelper.ref('matchmaking/$modeKey/waiting')
@@ -125,6 +126,7 @@ class MatchmakingService with ChangeNotifier {
   Future<void> stopMatchmaking() async {
     if (_currentWaitingPath != null) {
       await RealtimeDBHelper.removeData(_currentWaitingPath!);
+      if (kDebugMode) print('[MatchmakingService] Stopped matchmaking');
     }
     await _gameListener?.cancel();
     _gameListener = null;
