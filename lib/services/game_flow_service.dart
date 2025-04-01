@@ -44,7 +44,16 @@ class GameFlowService {
     try {
       timerService.startTimer(
         onTick: onTick,
-        onSpeedUp: onSpeedUp,
+        onSpeedUp:() async {
+          // Passage du mode normal au mode speed-up + ecrit dans la DB
+          await RealtimeDBHelper.updateData(
+            'games/${game.id}',
+            {'modeSpeedUp': true},
+          );
+          if (kDebugMode) {print('Mode speed-up activé.');}
+          if (onSpeedUp != null) { onSpeedUp(); }
+
+        },
         onForcedEnd: onForcedEnd,
       );
       if (kDebugMode) {
