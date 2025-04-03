@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/models/card_model.dart';
@@ -26,6 +27,9 @@ class GameStateProvider extends ChangeNotifier {
 
   int _currentCardIndex = 0;
   int get currentCardIndex => _currentCardIndex;
+
+  int _opponentCardIndex = 0;
+  int get opponentCardIndex => _opponentCardIndex;
 
   String _playerStatus = "in game";
   String get playerStatus => _playerStatus;
@@ -85,7 +89,8 @@ class GameStateProvider extends ChangeNotifier {
       if (playersData == null) return;
 
       final localData = playersData[gameFlowService.localPlayerId] as Map?;
-      if (localData == null) return;
+      final opponentData = playersData[gameFlowService.opponentPlayerId] as Map?;
+      if (localData == null || opponentData == null) return;
 
       final newIndex = localData['currentCardIndex'] ?? _currentCardIndex;
       final newElapsed = localData['elapsedTime'] ?? _elapsedTime;
@@ -94,12 +99,16 @@ class GameStateProvider extends ChangeNotifier {
       final newScore = localData['score'] ?? _score;
       final newResult = localData['gameResult'] ?? _gameResult;
 
+      final newOpponentIndex = opponentData['currentCardIndex'] ?? _opponentCardIndex;
+
+
       bool hasChanged = (newIndex != _currentCardIndex) ||
           (newElapsed != _elapsedTime) ||
           (newStatus != _playerStatus) ||
           (newIsOnline != _isOnline) ||
           (newScore != _score) ||
-          (newResult != _gameResult);
+          (newResult != _gameResult) ||
+          (newOpponentIndex != _opponentCardIndex);
 
       if (hasChanged) {
         _currentCardIndex = newIndex;
@@ -108,6 +117,7 @@ class GameStateProvider extends ChangeNotifier {
         _isOnline = newIsOnline;
         _score = newScore;
         _gameResult = newResult;
+        _opponentCardIndex = newOpponentIndex;
         notifyListeners();
       }
     });
