@@ -58,17 +58,10 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<GameStateProvider>();
 
-    // Si le joueur a terminé toutes ses cartes avant l'adversaire, on affiche un modal d'attente.
-    if (provider.currentCardIndex >= provider.totalCards && !_showWaitingModal) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showWaitingModal = true;
-        _showWaitingDialog();
-      });
-    }
-
-    // Récupération de l'index adversaire (si on le stocke dans widget.game ou via la DB)
-    final opponentId = provider.gameFlowService.opponentPlayerId;
-    final opponentIndex = widget.game.players[opponentId]?.currentCardIndex ?? 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Vérifie si le joueur local a terminé ses cartes
+      _checkWaitingConditions();
+    });
 
     return WillPopScope(
       onWillPop: _onWillPop, // Intercepter le bouton "retour" hardware
@@ -171,6 +164,18 @@ class _GameScreenState extends State<GameScreen> {
       return false;
     }
   }
+
+  void _checkWaitingConditions() {
+    if (!mounted || _showWaitingModal) return;
+    if (context.read<GameStateProvider>().currentCardIndex >=
+        context.read<GameStateProvider>().totalCards) {
+      setState(() {
+        _showWaitingModal = true;
+      });
+      _showWaitingDialog();
+    }
+  }
+
 
   /// Appelé quand on dépasse 6 minutes (timer expiré) OU si les deux joueurs ont fini
   /// OU en cas d'abandon => On finalise la partie
