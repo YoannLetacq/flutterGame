@@ -30,9 +30,13 @@ class GameFlowService {
     required this.eloService,
     required this.game,
     required this.gameRef,
+    required String userId,
   }) {
-    localPlayerId = game.players.keys.first;
-    opponentPlayerId = game.players.keys.last;
+    localPlayerId = userId;
+    opponentPlayerId = game.players.keys.firstWhere(
+          (id) => id != userId,
+          orElse: () => throw Exception('Opponent not found in games players.'),
+    );
   }
 
   void startGame({
