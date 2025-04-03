@@ -7,9 +7,6 @@ class GameProgressService {
   /// Si [currentIndex] < ([totalCards] - 1), l'index est incrémenté de 1.
   /// Sinon (dernière carte atteinte), renvoie le même index (on ne dépasse pas le dernier).
   int incrementCardIndex(int currentIndex, int totalCards) {
-    if (currentIndex < totalCards - 1) {
-      return currentIndex + 1;
-    }
-    return currentIndex; // Dernière carte, on ne change plus l'index.
+    return (currentIndex + 1).clamp(0, totalCards);
   }
 }
