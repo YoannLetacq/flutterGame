@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:untitled/services/auth_service.dart';
 
 import '../models/game_model.dart';
 import '../providers/game_state_provider.dart';
@@ -14,6 +15,11 @@ import '../ui/game_screen.dart';
 
 /// Fonction utilitaire pour lancer correctement la GameScreen avec son provider
 void navigateToGame(BuildContext context, GameModel game) {
+  final userId = context.read<AuthService>().currentUser?.uid;
+  if (userId == null) {
+    throw Exception('User ID is null. Cannot navigate to game screen.');
+  }
+
   Navigator.push(
     context,
     MaterialPageRoute(
@@ -26,6 +32,7 @@ void navigateToGame(BuildContext context, GameModel game) {
             eloService: context.read<EloService>(),
             game: game,
             gameRef: FirebaseDatabase.instance.ref('games/${game.id}'),
+            userId: userId,
           ),
           responseService: ResponseService(),
           timerService: context.read<TimerService>(),
