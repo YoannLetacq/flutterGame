@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:untitled/models/game_model.dart';
@@ -25,7 +26,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   bool _showWaitingModal = false;
-  bool _forceEndTriggered = false;
+  bool _hasForceEnd = false;
 
   @override
   void initState() {
@@ -45,8 +46,8 @@ class _GameScreenState extends State<GameScreen> {
       },
       onForcedEnd: () {
         // Appelé après 6 minutes
-        if (!_forceEndTriggered && mounted) {
-          _forceEndTriggered = true;
+        if (!_hasForceEnd && mounted) {
+          _hasForceEnd = true;
           _onGameFinished();
         }
       },
@@ -57,14 +58,15 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<GameStateProvider>();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Vérifie si le joueur local a terminé ses cartes
-      _checkWaitingConditions();
+      if (mounted) {
+        _checkWaitingConditions(provider);
+      }
     });
 
     return WillPopScope(
-      onWillPop: _onWillPop, // Intercepter le bouton "retour" hardware
+      onWillPop: _confirmAbandon, // Intercepter le bouton "retour" hardware
       child: Scaffold(
         appBar: AppBar(
           title: Text('Game ${widget.game.id}'),
@@ -129,11 +131,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// Intercepte le retour hardware
-  Future<bool> _onWillPop() async {
-    return _confirmAbandon(); // Même logique que la flèche AppBar
-  }
-
   /// Demande confirmation d'abandon
   Future<bool> _confirmAbandon() async {
     final abandonService = context.read<AbandonService>();
@@ -165,13 +162,25 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  void _checkWaitingConditions() {
+  void  _checkWaitingConditions(final GameStateProvider provider) {
     if (!mounted || _showWaitingModal) return;
-    if (context.read<GameStateProvider>().currentCardIndex >=
-        context.read<GameStateProvider>().totalCards) {
+
+    if (provider.currentCardIndex >= provider.totalCards &&
+        provider.playerStatus != 'waitingOpponent') {
       setState(() {
         _showWaitingModal = true;
       });
+
+      if (kDebugMode) {
+        print('[WaitingTimer] ${provider.gameFlowService.localPlayerId} - lancé (fin de partie forcée dans 60 sec)');
+      }
+
+      provider.timerService.startWaitingTimer(() {
+        if (!mounted) return;
+        // on declenche la fin forcee.
+          _onGameFinished();
+      });
+
       _showWaitingDialog();
     }
   }
@@ -180,7 +189,13 @@ class _GameScreenState extends State<GameScreen> {
   /// Appelé quand on dépasse 6 minutes (timer expiré) OU si les deux joueurs ont fini
   /// OU en cas d'abandon => On finalise la partie
   void _onGameFinished() {
+    final provider = context.read<GameStateProvider>();
+    provider.timerService.stopTimer();
+    provider.timerService.stopWaitingTimer();
     _finalizeMatch(isAbandon: false);
+
+    if (kDebugMode) print('[GameScreen] ${provider.gameFlowService.localPlayerId} - Fin de partie.');
+
   }
 
   /// Méthode commune pour finaliser la partie (abandon ou fin de timer)
@@ -241,6 +256,9 @@ class _GameScreenState extends State<GameScreen> {
 
   /// Simple modal d'attente pour le joueur qui a fini avant l'adversaire
   void _showWaitingDialog() {
+    if (kDebugMode) {
+      print('[WaitingDialog] ${context.read<GameStateProvider>().gameFlowService.localPlayerId} - Affichage modal');
+    }
     showDialog(
       barrierDismissible: false,
       context: context,
