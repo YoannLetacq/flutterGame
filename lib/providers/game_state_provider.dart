@@ -75,6 +75,10 @@ class GameStateProvider extends ChangeNotifier {
       gameFlowService.updatePlayerCardIndex(gameFlowService.localPlayerId, newIndex);
       // On met à jour l'index local
       _currentCardIndex = newIndex;
+      if (_currentCardIndex >= totalCards) {
+        // On a dépassé le nombre de cartes => on met à jour la DB
+        gameFlowService.updatePlayerStatus(gameFlowService.localPlayerId, 'waitingOpponent');
+      }
       notifyListeners();
     }
   }
