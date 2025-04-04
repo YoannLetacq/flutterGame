@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 /// Service de chronométrage de partie.
 /// - Rôle : gérer un chronomètre de jeu, notifier chaque seconde écoulée
 ///          et déclencher un mode "speed-up" après 5 minutes.
@@ -7,6 +9,7 @@ import 'dart:async';
 ///   et prévoit un arrêt forcé si on dépasse 6 minutes (360 sec).
 class TimerService {
   Timer? _timer;
+  Timer? _waitingTimer;
   int _elapsedSeconds = 0;
   bool _speedUpActivated = false;
 
@@ -45,6 +48,22 @@ class TimerService {
   void stopTimer() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  // Demarre le timer specfique quand un joueur termine avant l'autre
+  void startWaitingTimer(void Function() onWaitingTimeout) {
+    _waitingTimer?.cancel();
+    _waitingTimer = Timer(const Duration(seconds: 60), () {
+      onWaitingTimeout();
+    });
+    if (kDebugMode) { print('Waiting timer demarre.'); }
+  }
+
+  /// Arrête le timer d'attente
+  void stopWaitingTimer() {
+    _waitingTimer?.cancel();
+    _waitingTimer = null;
+    if (kDebugMode) { print('Waiting timer arrete.'); }
   }
 
   int get elapsedSeconds => _elapsedSeconds;
