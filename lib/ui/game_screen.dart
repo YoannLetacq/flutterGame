@@ -27,6 +27,7 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   bool _showWaitingModal = false;
   bool _hasForceEnd = false;
+  bool _hasFinished = false;
 
   @override
   void initState() {
@@ -62,6 +63,10 @@ class _GameScreenState extends State<GameScreen> {
       // Vérifie si le joueur local a terminé ses cartes
       if (mounted) {
         _checkWaitingConditions(provider);
+      }
+
+      if (kDebugMode) {
+        print('[Debug] Local: ${provider.playerStatus}, Opponent: ${provider.opponentStatus}');
       }
     });
 
@@ -162,40 +167,50 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  void  _checkWaitingConditions(final GameStateProvider provider) {
+  void _checkWaitingConditions(final GameStateProvider provider) {
     if (!mounted || _showWaitingModal) return;
 
-    if (provider.currentCardIndex >= provider.totalCards &&
-        provider.playerStatus != 'waitingOpponent') {
-      setState(() {
-        _showWaitingModal = true;
-      });
-
+    // 1) Si l’adversaire est “finished” et nous ne l’avons pas encore fini localement, on déclenche la fin locale
+    if (! _hasFinished && provider.opponentStatus == 'finished') {
       if (kDebugMode) {
-        print('[WaitingTimer] ${provider.gameFlowService.localPlayerId} - lancé (fin de partie forcée dans 60 sec)');
+        print('[GameScreen] Adversaire = finished => onGameFinished local');
       }
+      _onGameFinished();
+      return;
+    }
 
+    // 2) On a terminé avant l’adversaire => on lance le waitingTimer
+    if (provider.currentCardIndex >= provider.totalCards
+        && provider.playerStatus != 'waitingOpponent'
+        && provider.opponentStatus != 'waitingOpponent'
+        && provider.opponentStatus != 'finished')
+    {
+      setState(() => _showWaitingModal = true);
+      if (kDebugMode) {
+        print('[WaitingTimer] ${provider.gameFlowService.localPlayerId} => 60sec forced end');
+      }
       provider.timerService.startWaitingTimer(() {
         if (!mounted) return;
-        // on declenche la fin forcee.
-          _onGameFinished();
+        _onGameFinished();
       });
-
       _showWaitingDialog();
     }
   }
 
 
+
   /// Appelé quand on dépasse 6 minutes (timer expiré) OU si les deux joueurs ont fini
   /// OU en cas d'abandon => On finalise la partie
   void _onGameFinished() {
+    if (_hasFinished || !mounted) return;
+    _hasFinished = true;
+
     final provider = context.read<GameStateProvider>();
     provider.timerService.stopTimer();
     provider.timerService.stopWaitingTimer();
-    _finalizeMatch(isAbandon: false);
 
     if (kDebugMode) print('[GameScreen] ${provider.gameFlowService.localPlayerId} - Fin de partie.');
-
+    _finalizeMatch(isAbandon: false);
   }
 
   /// Méthode commune pour finaliser la partie (abandon ou fin de timer)
