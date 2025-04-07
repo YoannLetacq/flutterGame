@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/models/card_model.dart';
 import 'package:untitled/services/game_progress_service.dart';
@@ -34,8 +33,11 @@ class GameStateProvider extends ChangeNotifier {
   String _playerStatus = "in game";
   String get playerStatus => _playerStatus;
 
-  bool? _gameResult;
-  bool? get gameResult => _gameResult;
+  String _opponentStatus = "in game";
+  String get opponentStatus => _opponentStatus;
+
+  String? _gameResult;
+  String? get gameResult => _gameResult;
 
   bool _isOnline = true;
   bool get isOnline => _isOnline;
@@ -71,17 +73,42 @@ class GameStateProvider extends ChangeNotifier {
   /// Avance l'index de carte via [GameProgressService].
   void nextCard() {
     final newIndex = gameProgressService.incrementCardIndex(_currentCardIndex, totalCards);
+
     if (newIndex != _currentCardIndex) {
+      // on met à jour en DB
       gameFlowService.updatePlayerCardIndex(gameFlowService.localPlayerId, newIndex);
-      // On met à jour l'index local
+
+      // local set
       _currentCardIndex = newIndex;
+
+      // si on vient d’atteindre la fin
       if (_currentCardIndex >= totalCards) {
-        // On a dépassé le nombre de cartes => on met à jour la DB
-        gameFlowService.updatePlayerStatus(gameFlowService.localPlayerId, 'waitingOpponent');
+        final opponentStatus = _opponentStatus;
+        if (kDebugMode) {
+          print('[GameState] ${gameFlowService.localPlayerId} a terminé ses cartes. OpponentStatus=$opponentStatus');
+        }
+
+        //  On vérifie si l’adversaire est “waitingOpponent” OU déjà “finished”
+        if (opponentStatus == 'waitingOpponent' || opponentStatus == 'finished') {
+          if (kDebugMode) {
+            print('[GameState] Les deux joueurs ont fini => endGame local');
+          }
+          // On signale la fin côté local
+          gameFlowService.endGame(gameFlowService.localPlayerId);
+          // On ne finalise pas ici, on laisse le GameScreen faire finalizeMatch
+        } else {
+          // sinon, on se met en waiting
+          if (kDebugMode) {
+            print('[GameState] local terminé => statut=waitingOpponent');
+          }
+          gameFlowService.updatePlayerStatus(gameFlowService.localPlayerId, 'waitingOpponent');
+        }
       }
+
       notifyListeners();
     }
   }
+
 
   /// Écoute la DB, met à jour l'état local
   void _listenGameFlow() async {
@@ -104,7 +131,7 @@ class GameStateProvider extends ChangeNotifier {
       final newResult = localData['gameResult'] ?? _gameResult;
 
       final newOpponentIndex = opponentData['currentCardIndex'] ?? _opponentCardIndex;
-
+      final newOpponentStatus = opponentData['status'] ?? _opponentStatus;
 
       bool hasChanged = (newIndex != _currentCardIndex) ||
           (newElapsed != _elapsedTime) ||
@@ -112,7 +139,8 @@ class GameStateProvider extends ChangeNotifier {
           (newIsOnline != _isOnline) ||
           (newScore != _score) ||
           (newResult != _gameResult) ||
-          (newOpponentIndex != _opponentCardIndex);
+          (newOpponentIndex != _opponentCardIndex) ||
+          (newOpponentStatus != _opponentStatus);
 
       if (hasChanged) {
         _currentCardIndex = newIndex;
@@ -121,7 +149,9 @@ class GameStateProvider extends ChangeNotifier {
         _isOnline = newIsOnline;
         _score = newScore;
         _gameResult = newResult;
+
         _opponentCardIndex = newOpponentIndex;
+        _opponentStatus = newOpponentStatus;
         notifyListeners();
       }
     });
@@ -132,13 +162,6 @@ class GameStateProvider extends ChangeNotifier {
     _elapsedTime = secs;
     gameFlowService.updateElapsedTime(gameFlowService.localPlayerId, secs);
     notifyListeners();
-  }
-
-  /// Déclare la fin de partie, ex. on fait un booleen pour la victoire/défaite
-  void endGame(bool didWin) {
-    _gameResult = didWin;
-    notifyListeners();
-    gameFlowService.endGame(gameFlowService.localPlayerId);
   }
 
   /// Carte courante, ou null si on a dépassé la limite
