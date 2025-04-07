@@ -89,7 +89,7 @@ class GameStateProvider extends ChangeNotifier {
         }
 
         //  On vérifie si l’adversaire est “waitingOpponent” OU déjà “finished”
-        if (opponentStatus == 'waitingOpponent' || opponentStatus == 'finished') {
+        if (_opponentHasFinished()) {
           if (kDebugMode) {
             print('[GameState] Les deux joueurs ont fini => endGame local');
           }
@@ -107,6 +107,10 @@ class GameStateProvider extends ChangeNotifier {
 
       notifyListeners();
     }
+  }
+
+  bool _opponentHasFinished() {
+    return _opponentStatus == 'waitingOpponent' || _opponentStatus == 'finished';
   }
 
 
@@ -152,6 +156,12 @@ class GameStateProvider extends ChangeNotifier {
 
         _opponentCardIndex = newOpponentIndex;
         _opponentStatus = newOpponentStatus;
+        if (newStatus == 'finished') {
+          if (kDebugMode) {
+            print('[Sync] ${gameFlowService.localPlayerId} est passé à finished');
+          }
+        }
+
         notifyListeners();
       }
     });
