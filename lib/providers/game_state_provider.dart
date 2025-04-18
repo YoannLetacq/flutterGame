@@ -21,6 +21,9 @@ class GameStateProvider extends ChangeNotifier {
   int _score = 0;
   int get score => _score;
 
+  int _opponentScore = 0;
+  int get opponentScore => _opponentScore;
+
   int _elapsedTime = 0;
   int get elapsedTime => _elapsedTime;
 
@@ -35,6 +38,26 @@ class GameStateProvider extends ChangeNotifier {
 
   String _opponentStatus = "in game";
   String get opponentStatus => _opponentStatus;
+
+  bool _opponentOnline = true;
+  bool get opponentIsOnline => _opponentStatus != 'abandon'
+      && _opponentStatus != 'disconnected'
+      && _opponentOnline;
+
+  // event consummé par l'UI, par la nofication de deco
+  bool _oppJustDisconnected = false;
+  bool _oppJustReconnected = false;
+
+  bool get opponentJustDisconnected {
+    final v = _oppJustDisconnected;
+    _oppJustDisconnected = false;
+    return v;
+  }
+  bool get opponentJustReconnected {
+    final v = _oppJustReconnected;
+    _oppJustReconnected = false;
+    return v;
+  }
 
   String? _gameResult;
   String? get gameResult => _gameResult;
@@ -118,6 +141,7 @@ class GameStateProvider extends ChangeNotifier {
   void _listenGameFlow() async {
     _gameStateStream = await gameFlowService.listenGameState();
     _gameStateStream.listen((event) {
+
       final gameData = event.snapshot.value as Map?;
       if (gameData == null) return;
       final playersData = gameData['players'] as Map?;
@@ -125,6 +149,7 @@ class GameStateProvider extends ChangeNotifier {
 
       final localData = playersData[gameFlowService.localPlayerId] as Map?;
       final opponentData = playersData[gameFlowService.opponentPlayerId] as Map?;
+
       if (localData == null || opponentData == null) return;
 
       final newIndex = localData['currentCardIndex'] ?? _currentCardIndex;
@@ -135,7 +160,19 @@ class GameStateProvider extends ChangeNotifier {
       final newResult = localData['gameResult'] ?? _gameResult;
 
       final newOpponentIndex = opponentData['currentCardIndex'] ?? _opponentCardIndex;
-      final newOpponentStatus = opponentData['status'] ?? _opponentStatus;
+
+      final newOpponentStatus = (opponentData['status'] ?? _opponentStatus) as String;
+      final newOpponentOnline = (opponentData['isOnline'] ?? _opponentOnline) as bool;
+      final newOpponentScore = (opponentData['score'] as int?) ?? _opponentScore;
+
+      // delta de status reseau adversaire
+      final wasOnline = _opponentOnline;
+      if (wasOnline && !newOpponentOnline) {
+        _oppJustDisconnected = true;
+      } else if (!wasOnline && newOpponentOnline) {
+        _oppJustReconnected = true;
+      }
+
 
       bool hasChanged = (newIndex != _currentCardIndex) ||
           (newElapsed != _elapsedTime) ||
@@ -144,7 +181,9 @@ class GameStateProvider extends ChangeNotifier {
           (newScore != _score) ||
           (newResult != _gameResult) ||
           (newOpponentIndex != _opponentCardIndex) ||
-          (newOpponentStatus != _opponentStatus);
+          (newOpponentStatus != _opponentStatus) ||
+          (newOpponentScore != _opponentScore) ||
+          (newOpponentOnline != _opponentOnline);
 
       if (hasChanged) {
         _currentCardIndex = newIndex;
@@ -156,6 +195,8 @@ class GameStateProvider extends ChangeNotifier {
 
         _opponentCardIndex = newOpponentIndex;
         _opponentStatus = newOpponentStatus;
+        _opponentScore = newOpponentScore;
+        _opponentOnline = newOpponentOnline;
         if (newStatus == 'finished') {
           if (kDebugMode) {
             print('[Sync] ${gameFlowService.localPlayerId} est passé à finished');
