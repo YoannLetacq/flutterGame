@@ -25,6 +25,13 @@ class MatchmakingService with ChangeNotifier {
 
   /// Démarre le matchmaking pour un joueur donné
   Future<void> startMatchMaking(String userId, GameMode mode) async {
+    final unifinishedGame = await _hasUnfinishedGame(userId);
+    // Si le joueur a déjà une partie en cours, block la possibilité de relancer
+    // le matchmaking via un bug
+    if (unifinishedGame) {
+      if (kDebugMode) print('[MatchmakingService] Unfinished game found, cancelling matchmaking');
+      return;
+    }
     final String modeKey = mode == GameMode.CLASSEE ? 'ranked' : 'casual';
     final String waitingPath = 'matchmaking/$modeKey/waiting';
     _currentWaitingPath = waitingPath;
@@ -132,5 +139,31 @@ class MatchmakingService with ChangeNotifier {
     _gameListener = null;
     _isWaiting = false;
     notifyListeners();
+  }
+
+  Future<bool> _hasUnfinishedGame(String playerId) async {
+    final snap = await RealtimeDBHelper.ref(
+      'games',
+    )
+        .orderByChild('players/$playerId/status')
+        .equalTo('in game')
+        .once();
+
+    if (snap.snapshot.exists) return true;
+
+    final waitingSnap = await RealtimeDBHelper.ref('games')
+        .orderByChild('players/$playerId/status')
+        .equalTo('waitingOpponent')
+        .once();
+
+    final dc = await RealtimeDBHelper.ref('games')
+        .orderByChild('players/$playerId/status')
+        .equalTo('disconnected')
+        .once();
+    if (waitingSnap.snapshot.exists || dc.snapshot.exists) {
+      if (kDebugMode) print('[MatchmakingService] Unfinished game found');
+      return true;
+    }
+    return false;
   }
 }
