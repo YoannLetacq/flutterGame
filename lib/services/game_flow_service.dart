@@ -35,7 +35,7 @@ class GameFlowService {
     localPlayerId = userId;
     opponentPlayerId = game.players.keys.firstWhere(
           (id) => id != userId,
-          orElse: () => throw Exception('Opponent not found in games players.'),
+      orElse: () => throw Exception('Opponent not found in games players.'),
     );
   }
 
@@ -44,40 +44,44 @@ class GameFlowService {
     required void Function()? onSpeedUp,
     required void Function()? onForcedEnd,
     required String playerId,
-  }) {
+  }) async {
     try {
       timerService.startTimer(
         onTick: onTick,
-        onSpeedUp:() async {
-          // Passage du mode normal au mode speed-up + ecrit dans la DB
+        onSpeedUp: () async {
           await RealtimeDBHelper.updateData(
             'games/${game.id}',
             {'modeSpeedUp': true},
           );
-          if (kDebugMode) {print('Mode speed-up activé.');}
-          if (onSpeedUp != null) { onSpeedUp(); }
-
+          if (kDebugMode) print('Mode speed-up activé.');
+          onSpeedUp?.call();
         },
         onForcedEnd: onForcedEnd,
       );
-      if (kDebugMode) {
-        print('Chronomètre démarré.');
-      }
-      // Écrit un état initial
-      RealtimeDBHelper.updateData(
+
+      if (kDebugMode) print('Chronomètre démarré.');
+
+      // 🟦 Initialisation DB
+      await RealtimeDBHelper.updateData(
         'games/${game.id}',
         {
           'startTime': DateTime.now().millisecondsSinceEpoch,
           'modeSpeedUp': false,
         },
       );
-      // MàJ locales
-      updatePlayerScore(playerId, 0);
-      updatePlayerOnlineStatus(playerId, true);
-      updatePlayerStatus(playerId, 'in game');
-      updatePlayerCardIndex(playerId, 0);
-      updateElapsedTime(playerId, 0);
 
+      // 🟪 MàJ statut joueur
+      await updatePlayerScore(playerId, 0);
+      await updatePlayerOnlineStatus(playerId, true);
+
+      // 🔁 Proprement enregistrer `onDisconnect()` (⚠️ cancel first!)
+      final ref = RealtimeDBHelper.ref('games/${game.id}/players/$playerId');
+      await ref.onDisconnect().cancel();
+      await ref.onDisconnect().update({'isOnline': false});
+
+      await updatePlayerStatus(playerId, 'in game');
+      await updatePlayerCardIndex(playerId, 0);
+      await updateElapsedTime(playerId, 0);
     } catch (e, stackTrace) {
       if (kDebugMode) {
         print('Erreur startGame : $e');
@@ -87,6 +91,50 @@ class GameFlowService {
     }
   }
 
+
+  /// Verifie si l'adversaire est en ligne et met à jour son statut
+  Future<bool> checkAndMarkOpponentDisconnected(String opponentId) async {
+    try {
+      final opponentRef =
+      RealtimeDBHelper.ref('games/${game.id}/players/$opponentId');
+      final snap = await opponentRef.get();
+
+      final isOnline       = (snap.child('isOnline').value ?? true) == true;
+      final currentStatus  = snap.child('status').value?.toString() ?? 'in game';
+
+      // ───────── 1) premier passage : on marque disconnected ─────────
+      if (!isOnline &&
+          currentStatus != 'disconnected' &&
+          currentStatus != 'finished') {
+
+        if (kDebugMode) {
+          print('[Disconnection] Opponent offline → status=disconnected');
+        }
+
+        await opponentRef.update({'status': 'disconnected'});
+        return true;                          // vient d’être marqué
+      }
+
+      // ───────── 2) déjà marqué auparavant ─────────
+      if (!isOnline && currentStatus == 'disconnected') {
+        if (kDebugMode) {
+          print('[Disconnection] Opponent already disconnected → skip');
+        }
+        return true;                          // déjà traité
+      }
+
+      return false;                           // toujours en ligne
+    } catch (e) {
+      if (kDebugMode) {
+        print('Erreur checkAndMarkOpponentDisconnected : $e');
+      }
+      rethrow;
+    }
+  }
+
+
+
+  /// Met à jour le statut de connexion du joueur dans la DB
   Future<void> updatePlayerOnlineStatus(String playerId, bool isOnline) async {
     try {
       RealtimeDBHelper.updateData(
@@ -168,7 +216,7 @@ class GameFlowService {
   }
 
   Future<Stream<DatabaseEvent>> listenGameState() async {
-    final ref = await RealtimeDBHelper.ref('games/${game.id}');
+    final ref = RealtimeDBHelper.ref('games/${game.id}');
     return ref.onValue;
   }
 
@@ -185,53 +233,74 @@ class GameFlowService {
     required String opponentPlayerId,
     required bool wasRanked,
     required HistoryService historyService,
+    bool isAbandon = false,
   }) async {
     try {
-      timerService.stopTimer();
-      isGameEnded = true;
-
-      // 1) Déterminer vainqueur
-      String localResult = 'loss';
-      String opponentResult = 'win';
-      if (localScore > opponentScore) {
-        localResult = 'win';
-        opponentResult = 'loss';
-      } else if (localScore == opponentScore) {
-        localResult = 'tie';
-        opponentResult = 'tie';
+      // 0)  Mutex : si on a déjà un gameResult on s’arrête.
+      final localRef = RealtimeDBHelper.ref(
+          'games/${game.id}/players/$localPlayerId');
+      final snap = await localRef.child('gameResult').get();
+      if (snap.exists) {
+        if (kDebugMode) print('[Finalize] déjà finalisé → skip');
+        return true;
       }
 
-      // 2) Mettre à jour la DB pour les 2 joueurs
-      // "finished" + gameResult ("win"/"loss"/"tie")
-      await RealtimeDBHelper.updateData(
-        'games/${game.id}/players/$localPlayerId',
-        {
-          'status': 'finished',
-          'gameResult': localResult,
-        },
-      );
-      await RealtimeDBHelper.updateData(
-        'games/${game.id}/players/$opponentPlayerId',
-        {
-          'status': 'finished',
-          'gameResult': opponentResult,
-        },
-      );
+        timerService.stopTimer();
+        isGameEnded = true;
 
-      // 3) Enregistrement historique
-      //   - On peut décider d'enregistrer uniquement pour le joueur local
-      await historyService.recordGameHistory(localPlayerId, {
-        'date': DateTime.now(),
-        'score': localScore,
-        'opponentScore': opponentScore,
-        'result': localResult,
-        'mode': wasRanked ? 'ranked' : 'casual',
-      });
+        // 1)  Calcul victoire/défaite
+        String localResult    = 'loss';
+        String opponentResult = 'win';
 
-      if (kDebugMode) {
-        print('Partie finalisée : local=$localResult / opp=$opponentResult');
-      }
-      return true;
+        bool opponentDisconnected = false;
+        if (!isAbandon) {
+          opponentDisconnected =
+          await checkAndMarkOpponentDisconnected(opponentPlayerId);
+        }
+
+        if (isAbandon) {
+          /* rien à changer : défaite auto */
+        } else if (opponentDisconnected) {
+          localResult = 'win';
+          opponentResult = 'loss';
+        } else if (localScore > opponentScore) {
+          localResult = 'win';
+          opponentResult = 'loss';
+        } else if (localScore == opponentScore) {
+          localResult = 'tie';
+          opponentResult = 'tie';
+        }
+
+        // 2)  Écritures atomiques
+        await localRef.update({
+          'status'     : isAbandon ? 'abandon' : 'finished',
+          'gameResult' : localResult,
+        });
+
+        final oppRef = RealtimeDBHelper.ref(
+            'games/${game.id}/players/$opponentPlayerId');
+        final oppSnap = await oppRef.child('status').get();
+        final alreadyAbandon = oppSnap.value == 'abandon';
+
+        await oppRef.update({
+          if (!alreadyAbandon) 'status': 'finished',
+          'gameResult'        : opponentResult,
+        });
+
+        // 3)  Historique
+        await historyService.recordGameHistory(localPlayerId, {
+          'date'          : DateTime.now(),
+          'score'         : localScore,
+          'opponentScore' : opponentScore,
+          'result'        : localResult,
+          'mode'          : wasRanked ? 'ranked' : 'casual',
+        });
+
+        if (kDebugMode) {
+          print('[Result] Local=$localScore Opp=$opponentScore '
+              '→ $localResult / $opponentResult');
+        }
+        return true;
     } catch (e, st) {
       if (kDebugMode) {
         print('Erreur finalizeMatch : $e');
@@ -240,4 +309,7 @@ class GameFlowService {
       return false;
     }
   }
+
+
+
 }
