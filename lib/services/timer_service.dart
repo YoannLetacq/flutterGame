@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:untitled/providers/game_state_provider.dart';
 
 /// Service de chronométrage de partie.
 /// - Rôle : gérer un chronomètre de jeu, notifier chaque seconde écoulée
@@ -10,6 +11,7 @@ import 'package:flutter/foundation.dart';
 class TimerService {
   Timer? _timer;
   Timer? _waitingTimer;
+  Timer? _disconnectTimer;
   int _elapsedSeconds = 0;
   bool _speedUpActivated = false;
 
@@ -65,6 +67,19 @@ class TimerService {
     _waitingTimer = null;
     if (kDebugMode) { print('Waiting timer arrete.'); }
   }
+
+  /// Lance un compte à rebours de 60 s côté joueur connecté
+  void startDisconnectTimer(void Function() onTimeout) {
+    _disconnectTimer?.cancel();
+    _disconnectTimer = Timer(const Duration(seconds: 0), onTimeout);
+  }
+
+  /// Stoppe ce timer (reconnexion de l’adversaire)
+  void stopDisconnectTimer() {
+    _disconnectTimer?.cancel();
+    _disconnectTimer = null;
+  }
+
 
   int get elapsedSeconds => _elapsedSeconds;
   bool get speedUpActivated => _speedUpActivated;
