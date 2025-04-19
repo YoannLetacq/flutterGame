@@ -92,6 +92,13 @@ class MatchmakingService with ChangeNotifier {
 
   /// Création de la partie (Joueur 2 uniquement)
   Future<void> _createGame(String userId, String opponentId, GameMode mode) async {
+    final unifinishedGame = await _hasUnfinishedGame(userId);
+    // Si le joueur a déjà une partie en cours, block la possibilité de relancer
+    // le matchmaking via un bug
+    if (unifinishedGame) {
+      if (kDebugMode) print('[MatchmakingService] Unfinished game found, cancelling games creation');
+      return;
+    }
     final newGameRef = RealtimeDBHelper.push('games');
     final String newGameId = newGameRef.key!;
 
