@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:untitled/helpers/realtime_db_helper.dart';
+import 'package:untitled/providers/game_state_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/ranking_service.dart';
 import '../../services/history_service.dart';
@@ -131,13 +133,23 @@ class _ResultScreenState extends State<ResultScreen>
               ),
             ElevatedButton(
               child: const Text('Retour à l\'accueil'),
-              onPressed: () {
-                // Retour forcé à l'écran Home
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      (route) => false,
-                );
+              onPressed: () async {
+                final provider = context.read<GameStateProvider>();
+                final gameId = provider.gameFlowService.game.id;
+
+                // Supprime la partie de la RTDB.
+                await RealtimeDBHelper.removeData('game/$gameId');
+
+                // reset l'etat local
+                provider.reset();
+
+                //retour a la page home
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        (route) => false,
+                  );
+                }
               },
             ),
           ],
