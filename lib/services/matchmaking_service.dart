@@ -76,16 +76,22 @@ class MatchmakingService with ChangeNotifier {
     _gameListener = RealtimeDBHelper.ref('games').onChildAdded.listen((event) {
       final data = event.snapshot.value as Map?;
       if (data == null) return;
+      if (data['cards'] is! List) return;
       final players = data['players'] as Map?;
       if (players == null) return;
 
       if (players.containsKey(userId)) {
-        if (kDebugMode) print('[MatchmakingService] Game detected!');
-        _currentGame = GameModel.fromJson({...data, 'id': event.snapshot.key});
-        _isWaiting = false;
-        _gameListener?.cancel();
-        _gameListener = null;
-        notifyListeners();
+            if (_currentGame != null) return;
+            final stillExist = (event.snapshot.exists &&
+                event.snapshot.child('cards').exists);
+            if (!stillExist) return;
+
+            if (kDebugMode) print('[MatchmakingService] Game Detected');
+            _currentGame = GameModel.fromJson({...data, 'id': event.snapshot.key});
+            _isWaiting = false;
+            _gameListener?.cancel();
+            _gameListener = null;
+            notifyListeners();
       }
     });
   }
@@ -173,4 +179,13 @@ class MatchmakingService with ChangeNotifier {
     }
     return false;
   }
+
+  void clear() {
+    _currentGame  = null;
+    _isWaiting    = false;
+    _gameListener?.cancel();
+    _gameListener = null;
+    notifyListeners();
+  }
 }
+
