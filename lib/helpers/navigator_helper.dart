@@ -15,32 +15,32 @@ import '../ui/game_screen.dart';
 
 /// Fonction utilitaire pour lancer correctement la GameScreen avec son provider
 void navigateToGame(BuildContext context, GameModel game) {
-  final userId = context.read<AuthService>().currentUser?.uid;
-  if (userId == null) {
-    throw Exception('User ID is null. Cannot navigate to game screen.');
-  }
+  final userId = context.read<AuthService>().currentUser!.uid;
+
+   // ① — instancie UN SEUL GameStateProvider
+   final gameState = GameStateProvider(
+     gameFlowService: GameFlowService(
+       timerService     : context.read<TimerService>(),
+       progressService  : context.read<GameProgressService>(),
+       abandonService   : context.read<AbandonService>(),
+       eloService       : context.read<EloService>(),
+       game             : game,
+       gameRef          : FirebaseDatabase.instance.ref('games/${game.id}'),
+       userId           : userId,
+     ),
+     responseService     : ResponseService(),
+     timerService        : context.read<TimerService>(),
+     gameProgressService : context.read<GameProgressService>(),
+     cards               : game.cards,
+   );
 
   Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ChangeNotifierProvider(
-        create: (_) => GameStateProvider(
-          gameFlowService: GameFlowService(
-            timerService: context.read<TimerService>(),
-            progressService: context.read<GameProgressService>(),
-            abandonService: context.read<AbandonService>(),
-            eloService: context.read<EloService>(),
-            game: game,
-            gameRef: FirebaseDatabase.instance.ref('games/${game.id}'),
-            userId: userId,
-          ),
-          responseService: ResponseService(),
-          timerService: context.read<TimerService>(),
-          gameProgressService: context.read<GameProgressService>(),
-          cards: game.cards,
-        ),
-        child: GameScreen(game: game),
-      ),
-    ),
+  context,
+  MaterialPageRoute(
+  builder: (_) => ChangeNotifierProvider.value(
+          value : gameState,          // ② — même instance réutilisable
+          child : GameScreen(game: game),
+  ),
+  ),
   );
 }
