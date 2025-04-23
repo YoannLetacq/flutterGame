@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 // Tes imports de services
 import 'package:untitled/providers/connectivity_provider.dart';
+import 'package:untitled/ui/widgets/kick_listener_widget.dart';
 import 'services/auth_service.dart';
 import 'services/matchmaking_service.dart';
 import 'services/session_management_service.dart';
@@ -24,11 +25,17 @@ import 'ui/login_screen.dart';
 import 'ui/home_screen.dart';
 import 'firebase_options.dart';
 
+// ─────────────────────────── GLOBAL KEYS ─────────────────────────────
+
+final GlobalKey<ScaffoldMessengerState> rootMessengerKey =
+GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
 
   runApp(
     MultiProvider(
@@ -80,13 +87,14 @@ void main() async {
           create: (_) => MatchmakingService(),
         ),
       ],
-      child: const MyApp(),
+      child: const KickListener(child: MyApp()),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     final authService = context.read<AuthService>();
@@ -94,6 +102,7 @@ class MyApp extends StatelessWidget {
     final bool loggedIn = authService.isLoggedIn;
 
     return MaterialApp(
+      scaffoldMessengerKey: rootMessengerKey,
       title: 'Flutter Game',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
