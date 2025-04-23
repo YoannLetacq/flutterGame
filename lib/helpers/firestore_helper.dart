@@ -133,5 +133,21 @@ class FirestoreHelper {
     }
   }
 
+  // Check si docuement existe
+  static Future<bool> documentExists({
+    required String collection,
+    required String docId,
+  }) async {
+    try {
+      final docSnapshot = await _db.collection(collection).doc(docId).get();
+      return docSnapshot.exists;
+    } catch (e, stack) {
+      if (kDebugMode) {
+        print('Error checking document existence: $e');
+        print(stack);
+      }
+      rethrow;
+    }
+  }
 
 }
