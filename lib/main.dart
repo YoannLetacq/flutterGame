@@ -33,8 +33,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        // AuthService n'est pas un ChangeNotifier, donc Provider simple
-        Provider<AuthService>(
+        ChangeNotifierProvider<AuthService>(
           create: (_) => AuthService(
             firebaseAuth: FirebaseAuth.instance,
             googleSignIn: GoogleSignIn(),
