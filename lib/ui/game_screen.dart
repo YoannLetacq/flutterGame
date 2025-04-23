@@ -66,10 +66,10 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     return WillPopScope(
-      onWillPop: _confirmAbandon,
+      onWillPop: () async => false,
       child: Scaffold(
         appBar: _buildAppBar(),
-        body  : _buildBody(p),
+        body: _buildBody(p),
       ),
     );
   }
@@ -77,10 +77,7 @@ class _GameScreenState extends State<GameScreen> {
   // ─────────────────────────────  UI helpers  ────────────────────────────────
   PreferredSizeWidget _buildAppBar() => AppBar(
     title: Text('Game ${widget.game.id}'),
-    leading: IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: _confirmAbandon,
-    ),
+    automaticallyImplyLeading: false,
     actions: [
       IconButton(
         icon: const Icon(Icons.flag),
@@ -252,24 +249,26 @@ class _GameScreenState extends State<GameScreen> {
     if (!mounted) return;
     if (resultStr == null) return Navigator.pop(context);
 
-    // Si l’adversaire a abandonné, on le marque comme déconnecté
+    // Si l’adversaire a abandonné, on le marque comme abandonné
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => ResultScreen(
-          playerWon     : resultStr == 'win',
-          playerScore   : p.score,
-          opponentScore : p.opponentScore,
-          wasRanked     : false,
-          opponentId    : p.gameFlowService.opponentPlayerId,
-        ),
+          builder: (_) => ChangeNotifierProvider.value(    value : p,                         // même GameStateProvider
+              child : ResultScreen(
+              playerWon    : resultStr == 'win',
+              playerScore  : p.score,
+              opponentScore: p.opponentScore,
+              wasRanked    : false,
+              opponentId   : p.gameFlowService.opponentPlayerId,
+            ),
+            ),
       ),
     );
   }
 
   // ─────────────────────────────  DIALOG UE  ─────────────────────────────────
-  void _showWaitingDialog() => showDialog(
+  void  _showWaitingDialog() => showDialog(
     barrierDismissible: false,
     context: context,
     builder: (_) => const AlertDialog(
