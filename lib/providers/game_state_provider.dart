@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/models/card_model.dart';
@@ -65,7 +67,7 @@ class GameStateProvider extends ChangeNotifier {
   bool _isOnline = true;
   bool get isOnline => _isOnline;
 
-  late final Stream<DatabaseEvent> _gameStateStream;
+  StreamSubscription<DatabaseEvent>? _gameStateStream;
 
   GameStateProvider({
     required this.gameFlowService,
@@ -139,8 +141,8 @@ class GameStateProvider extends ChangeNotifier {
 
   /// Écoute la DB, met à jour l'état local
   void _listenGameFlow() async {
-    _gameStateStream = await gameFlowService.listenGameState();
-    _gameStateStream.listen((event) {
+    final stream = await gameFlowService.listenGameState();
+    _gameStateStream = stream.listen((event) {
 
       final gameData = event.snapshot.value as Map?;
       if (gameData == null) return;
@@ -212,6 +214,26 @@ class GameStateProvider extends ChangeNotifier {
   void updateElapsedTime(int secs) {
     _elapsedTime = secs;
     gameFlowService.updateElapsedTime(gameFlowService.localPlayerId, secs);
+    notifyListeners();
+  }
+
+  Future<void> reset() async {
+    _gameStateStream?.cancel();
+    _gameStateStream = null;
+    _score               = 0;
+    _opponentScore       = 0;
+    _elapsedTime         = 0;
+    _currentCardIndex    = 0;
+    _opponentCardIndex   = 0;
+    _playerStatus        = 'in game';
+    _opponentStatus      = 'in game';
+    _opponentOnline      = true;
+    _oppJustDisconnected = false;
+    _oppJustReconnected  = false;
+    _gameResult          = null;
+    timerService.stopTimer();
+    timerService.stopWaitingTimer();
+    timerService.stopDisconnectTimer();
     notifyListeners();
   }
 
