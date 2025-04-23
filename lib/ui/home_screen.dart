@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_profile_service.dart';
+import '../providers/game_state_provider.dart';
+import '../services/matchmaking_service.dart';
 import 'login_screen.dart';
 import 'matchmaking_screen.dart';
 
@@ -12,8 +14,13 @@ import 'matchmaking_screen.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MatchmakingService>().clear();
+      context.read<GameStateProvider?>()?.reset();
+    });
     final userProfile = Provider.of<UserProfileService>(context, listen: false).getUserProfile();
     final authService = Provider.of<AuthService>(context, listen: false);
     final userName = userProfile['displayName'] ?? 'Joueur';
@@ -28,6 +35,7 @@ class HomeScreen extends StatelessWidget {
             onPressed: () async {
               await authService.signOut();
               // Retour au LoginScreen après déconnexion
+              if (!context.mounted) return;
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
