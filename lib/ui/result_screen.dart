@@ -105,7 +105,7 @@ class _ResultScreenState extends State<ResultScreen>
   Widget build(BuildContext context) {
     final resultText = widget.playerWon ? 'Victoire !' : 'Défaite';
     return Scaffold(
-      appBar: AppBar(title: const Text('Résultat')),
+      appBar: AppBar(title: const Text('Résultat'), automaticallyImplyLeading: false,),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -135,19 +135,21 @@ class _ResultScreenState extends State<ResultScreen>
               child: const Text('Retour à l\'accueil'),
               onPressed: () async {
                 final provider = context.read<GameStateProvider>();
-                final gameId = provider.gameFlowService.game.id;
 
-                // Supprime la partie de la RTDB.
-                await RealtimeDBHelper.removeData('game/$gameId');
+                // suppression du noeud
+                await provider.gameFlowService.tryDeleteGameNodeIfFinished();
 
                 // reset l'etat local
-                provider.reset();
+                await provider.reset();
 
+                if (kDebugMode) {
+                  print("[ResultScreen] reset du GameStateProvider.");
+                }
                 //retour a la page home
                 if (context.mounted) {
                   Navigator.pushAndRemoveUntil(context,
                     MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        (route) => false,
+                    (_) => false,
                   );
                 }
               },
