@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:untitled/helpers/firestore_helper.dart';
 import '../../services/auth_service.dart';
 import 'home_screen.dart';
 
@@ -11,10 +12,11 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Récupère le service d'authentification.
     final authService = Provider.of<AuthService>(context, listen: false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
+      appBar: AppBar(title: const Text('Connexion'), automaticallyImplyLeading: false,),
       body: Center(
         child: ElevatedButton.icon(
           icon: const Icon(Icons.login),
@@ -23,6 +25,7 @@ class LoginScreen extends StatelessWidget {
             final result = await authService.signInWithGoogle();
             if (result != null) {
               // Navigation vers l'accueil avec transition slide
+              if (!context.mounted) return;
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
