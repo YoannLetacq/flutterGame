@@ -310,6 +310,27 @@ class GameFlowService {
     }
   }
 
+  // / Supprime le noeud de la partie si tous les joueurs sont déconnectés
+  Future<void> _tryDeleteGameNodeIfFinished() async {
+    final ref = RealtimeDBHelper.ref('games/${game.id}');
+    await ref.runTransaction((data) {
+      if (data is! Map) return Transaction.abort();
 
+      final  players = data['players'] as Map?;
+      if (players is! Map) return Transaction.abort();
 
+      final everyoneDone = players.values.every((p) {
+        final status = (p as Map)['status'] as String?;
+        return status == 'finished' || status == 'abandon' || status == 'disconnected';
+      });
+
+      if (everyoneDone) {
+        // en retournant `null` sur tout le noued games/gameId
+        return Transaction.success(null);
+      }
+      return Transaction.abort();
+    });
+  }
+
+  Future<void> tryDeleteGameNodeIfFinished() => _tryDeleteGameNodeIfFinished();
 }
