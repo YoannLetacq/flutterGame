@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 // Tes imports de services
 import 'package:untitled/providers/connectivity_provider.dart';
+import 'package:untitled/services/card_service.dart';
 import 'package:untitled/ui/widgets/kick_listener_widget.dart';
 import 'services/auth_service.dart';
 import 'services/matchmaking_service.dart';
@@ -52,6 +53,9 @@ void main() async {
         ),
         Provider<UserProfileService>(
           create: (_) => UserProfileService(),
+        ),
+        Provider<CardService>(
+          create: (_) => CardService(),
         ),
         Provider<EloService>(
           create: (_) => EloService(),
