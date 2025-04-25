@@ -1,0 +1,1 @@
+enum LearningViewMode { list, grid }
