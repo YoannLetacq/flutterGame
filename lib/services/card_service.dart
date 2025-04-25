@@ -35,4 +35,16 @@ class CardService {
     final secondHalf = shuffledCards.sublist(10, 20);
     return [firstHalf, secondHalf];
   }
+
+  /// filtre les cartes en fonction de la recherche
+  /// renvoie [source] filtre par [query]
+  List<CardModel> filter(List<CardModel> source, String query) {
+    if (query.trim().isEmpty) return List<CardModel>.from(source);
+
+    final queryLower = query.toLowerCase();
+    return source.where((card) {
+      return card.name.toLowerCase().contains(queryLower) ||
+          card.explanation.toLowerCase().contains(queryLower);
+    }).toList();
+  }
 }
