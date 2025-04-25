@@ -30,13 +30,17 @@ class _LearningScreenState extends State<LearningScreen> {
     setState(() => _all = _filtered = cards);
   }
 
-  void _search(String q) => setState(() {
-    _query = q;
-    _filtered = _all.where((c) {
-      final n = c.name.toLowerCase(), e = c.explanation.toLowerCase();
-      return n.contains(q.toLowerCase()) || e.contains(q.toLowerCase());
-    }).toList();
-  });
+  void _search(String q) {
+    q = q.trim();
+    setState(() {
+      _query = q;
+      _filtered = _all.where((c) {
+        final n = c.name.toLowerCase();
+        final e = c.explanation.toLowerCase();
+        return n.contains(q.toLowerCase()) || e.contains(q.toLowerCase());
+      }).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
