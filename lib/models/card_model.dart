@@ -3,11 +3,8 @@ class CardModel {
   final String name;         // Intitulé de la carte
   final String definition;   // Définition ou complément
   final int answer;          // Index de la réponse attendue
-  /*
-  final String explanation;  // Explication
-  final List<String> hints;  // Indices (non utilisés ici)
-  final String imageUrl;     // URL d'image (non utilisé ici)
-   */
+  final String explanation;  //  explanation est le champ explicatif pour le learning screen
+  final String imageUrl;     // imageUrl est le champ d'image pour le learning screen
   final List<String> options; // Tableau de réponses proposées
   final String type;         // "definition" ou "complement"
 
@@ -18,6 +15,8 @@ class CardModel {
     required this.answer,
     required this.options,
     required this.type,
+    required this.explanation,
+    required this.imageUrl,
   });
 
   factory CardModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +29,8 @@ class CardModel {
           ? List<String>.from(json['options'])
           : (json['options'] is String ? [json['options'] as String] : []),
       type: json['type'] as String? ?? '',
+      explanation: json['explanation'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
     );
   }
 
@@ -41,6 +42,8 @@ class CardModel {
       'answer': answer,
       'options': options,
       'type': type,
+      'explanation': explanation,
+      'imageUrl': imageUrl,
     };
   }
 }
