@@ -1,15 +1,9 @@
-import 'package:untitled/services/similarity_service.dart';
-
+/// Service d'évaluation de réponses.
+/// - Rôle : vérifier si la réponse du joueur correspond à la réponse attendue.
 class ResponseService {
-  final SimilarityService similarityService;
-
-  ResponseService({SimilarityService? similarityService})
-      : similarityService = similarityService ?? SimilarityService();
-
-  /// Évalue la réponse de l'utilisateur par rapport à la réponse attendue.
-  /// Retourne true si la similarité dépasse le seuil (par défaut 0.8), sinon false.
-  bool evaluateResponse(String userResponse, String expectedResponse, {double threshold = 0.8}) {
-    final double similarity = similarityService.calculateSimilarity(userResponse, expectedResponse);
-    return similarity >= threshold;
+  /// Vérifie si l'indice [userResponseIndex] correspond à la bonne réponse [expectedIndex].
+  /// Retourne true si c'est correct, sinon false.
+  bool evaluateResponse(int userResponseIndex, int expectedIndex) {
+    return userResponseIndex == expectedIndex;
   }
 }

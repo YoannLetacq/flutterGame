@@ -1,154 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/models/card_model.dart';
+import '../../services/security_service.dart';
 
+/// Widget de réponse pour une carte de type [CardModel].
+/// On affiche les options sous forme de RadioListTile.
+/// Lorsque l'utilisateur clique sur "Valider", on appelle [onAnswer] avec l'index sélectionné.
 class CardResponseWidget extends StatefulWidget {
-  final String cardType; // "complement" ou "definition"
-  final List<String>? options; // Utilisé si cardType == "definition"
-  final void Function(String response) onSubmit;
-  /// Pour une carte "definition", représente le texte de la question/définition.
-  /// Pour une carte "complement", représente le mot-clé.
-  final String? questionText;
+  final CardModel? card;
+  final ValueChanged<int> onAnswer;
 
   const CardResponseWidget({
     super.key,
-    required this.cardType,
-    this.options,
-    required this.onSubmit,
-    this.questionText,
+    required this.card,
+    required this.onAnswer,
   });
 
   @override
   State<CardResponseWidget> createState() => _CardResponseWidgetState();
 }
 
-class _CardResponseWidgetState extends State<CardResponseWidget>
-    with SingleTickerProviderStateMixin {
-  final TextEditingController _controller = TextEditingController();
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _scaleAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _handleTextSubmit() {
-    final response = _controller.text;
-    widget.onSubmit(response);
-    _controller.clear();
-  }
+class _CardResponseWidgetState extends State<CardResponseWidget> {
+  final _security = SecurityService();
+  int? _selectedIndex;
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: Card(
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        elevation: 6,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: widget.cardType == 'definition' && widget.options != null
-              ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Afficher la définition (la question) en haut, à l'intérieur de la carte.
-              if (widget.questionText != null)
-                Text(
-                  widget.questionText!,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-              const SizedBox(height: 4),
-              // Afficher en petit et italique le texte d'instruction.
-              Text(
-                'Choisissez la bonne réponse',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(fontStyle: FontStyle.italic),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              // Afficher les options sous forme de liste verticale.
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: widget.options!.map((option) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () => widget.onSubmit(option),
-                      child: Text(option),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          )
-              : // Pour les cartes "complement"
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Afficher le mot-clé en haut de la carte.
-              if (widget.questionText != null)
-                Text(
-                  widget.questionText!,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-              const SizedBox(height: 16),
-              // Champ de saisie pour la réponse.
-              TextField(
-                controller: _controller,
-                decoration: const InputDecoration(
-                  hintText: "Entrez votre réponse ici",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Bouton de validation.
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _handleTextSubmit,
-                child: const Text("Valider"),
-              ),
-            ],
+    // Si pas de carte, on n'affiche rien
+    if (widget.card == null) {
+      return const SizedBox.shrink();
+    }
+
+    final cardModel = widget.card!;
+    final options = cardModel.options;
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Liste de RadioListTile pour chaque option
+          for (int i = 0; i < options.length; i++)
+            RadioListTile<int>(
+              title: Text(options[i]),
+              value: i,
+              groupValue: _selectedIndex,
+              onChanged: (val) {
+                setState(() {
+                  _selectedIndex = val;
+                });
+              },
+            ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () {
+              // Vérification via SecurityService si tu le souhaites
+              if (_selectedIndex != null &&
+                  _security.validatePlayerResponse(options[_selectedIndex!])) {
+                widget.onAnswer(_selectedIndex!);
+                setState(() {
+                  _selectedIndex = null; // réinitialise la sélection
+                });
+              }
+            },
+            child: const Text('Valider'),
           ),
-        ),
+        ],
       ),
     );
   }

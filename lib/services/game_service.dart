@@ -1,34 +1,31 @@
-import 'package:untitled/repositories/game_repository_interface.dart';
-import 'package:untitled/models/game_model.dart';
+import '../repositories/game_repository.dart';
+import '../repositories/game_repository_interface.dart';
 
+/// Service de gestion des parties.
+/// - Rôle : orchestrer la création, la récupération et la suppression des parties en s'appuyant sur le dépôt de données.
+/// - Dépendances : [IGameRepository] pour effectuer les opérations sur la base de données (Firestore).
+/// - Retourne des objets [GameModel] ou void selon l'opération effectuée.
 class GameService {
-  final IGameRepository _gameRepository;
+  final IGameRepository _gameRepository = GameRepository();
 
-  GameService({required IGameRepository gameRepository})
-      : _gameRepository = gameRepository;
-
-  /// Crée une nouvelle partie à partir d'une instance de GameModel.
-  /// Ici, l'ID est déjà présent dans le modèle.
-  Future<void> createGame(GameModel game) async {
-    final gameData = game.toJson();
+  /// Crée une nouvelle partie persistante (sauvegardée en Firestore).
+  /// [gameData] est une map représentant le GameModel à stocker (par ex: issue de game.toJson()).
+  Future<void> createGame(Map<String, dynamic> gameData) async {
     await _gameRepository.createGame(gameData);
   }
 
-  /// Récupère une partie sous forme de GameModel à partir de son ID.
-  Future<GameModel?> getGame(String gameId) async {
-    final data = await _gameRepository.getGame(gameId);
-    if (data != null) {
-      return GameModel.fromJson(data);
-    }
-    return null;
+  /// Récupère les données d'une partie à partir de son [gameId].
+  /// Retourne les données sous forme de Map (contenant par exemple les players, scores, etc.), ou null si non trouvé.
+  Future<Map<String, dynamic>?> getGame(String gameId) async {
+    return await _gameRepository.getGame(gameId);
   }
 
-  /// Met à jour une partie avec les données fournies.
-  Future<void> updateGame(String gameId, Map<String, dynamic> updates) async {
-    await _gameRepository.updateGame(gameId, updates);
+  /// Met à jour les données de la partie [gameId] avec les nouvelles valeurs [gameData].
+  Future<void> updateGame(String gameId, Map<String, dynamic> gameData) async {
+    await _gameRepository.updateGame(gameId, gameData);
   }
 
-  /// Supprime une partie à partir de son ID.
+  /// Supprime la partie identifiée par [gameId].
   Future<void> deleteGame(String gameId) async {
     await _gameRepository.deleteGame(gameId);
   }

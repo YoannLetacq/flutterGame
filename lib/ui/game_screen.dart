@@ -1,212 +1,280 @@
 import 'package:flutter/material.dart';
-import 'package:untitled/models/card_model.dart';
-import 'package:untitled/services/card_service.dart';
-import 'package:untitled/services/response_service.dart';
+import 'package:provider/provider.dart';
+import 'package:untitled/helpers/realtime_db_helper.dart';
+import 'package:untitled/models/game_model.dart';
+import 'package:untitled/providers/game_state_provider.dart';
+import 'package:untitled/services/abandon_service.dart';
+import 'package:untitled/services/history_service.dart';
+import 'package:untitled/ui/result_screen.dart';
 import 'package:untitled/ui/widgets/animated_card_display.dart';
 import 'package:untitled/ui/widgets/card_response_widget.dart';
-import 'package:untitled/ui/widgets/player_progress_bar_widget.dart';
+import 'package:untitled/ui/widgets/disconnect_notif_widget.dart';
 import 'package:untitled/ui/widgets/opponent_progress_bar_widget.dart';
+import 'package:untitled/ui/widgets/player_progress_bar_widget.dart';
 
+/// Écran principal de la partie.
+/// - Gère le chronomètre (5min + speed-up 1min), l'abandon, et la fin de partie.
+/// - Toute la logique de fin (mise à jour DB, enregistrement historique) est déléguée à [GameFlowService.finalizeMatch].
+/// - À la fin, on navigue vers un [ResultScreen].
 class GameScreen extends StatefulWidget {
-  static const routeName = '/game';
-  const GameScreen({super.key});
+  final GameModel game;
+  const GameScreen({super.key, required this.game});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  final CardService _cardService = CardService();
-  final ResponseService _responseService = ResponseService();
-  List<CardModel> cards = [];
-  int currentIndex = 0;
-  bool isLoading = true;
-  int score = 0;
+  // ────────────────────────────────── STATE ──────────────────────────────────
+  bool _waitingTimerStarted         = false;
 
-  // Valeurs de progression exprimées entre 0 et 1.
-  double userProgress = 0.0;
-  double opponentProgress = 0.0;
+  bool _hasForceEnd                 = false;
+  bool _hasFinished                 = false;
 
-  CardModel? get currentCard =>
-      (cards.isNotEmpty && currentIndex < cards.length) ? cards[currentIndex] : null;
+  bool _disconnectWorkflowActive    = false;      // nouveau
+  // ────────────────────────────────────────────────────────────────────────────
 
+  // ─────────────────────────────   INIT   ────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _loadCards();
+    final provider = context.read<GameStateProvider>();
+
+    provider.gameFlowService.startGame(
+      onTick      : provider.updateElapsedTime,
+      onSpeedUp   : () => setState(() {}),            // simple refresh
+      onForcedEnd : () {
+        if (!_hasForceEnd && mounted) {
+          _hasForceEnd = true;
+          _onGameFinished();
+        }
+      },
+      playerId: provider.gameFlowService.localPlayerId,
+    );
   }
 
-  Future<void> _loadCards() async {
-    try {
-      final fetchedCards = await _cardService.fetchCards();
-      if (mounted) {
-        setState(() {
-          cards = fetchedCards;
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-      // Gérer l'erreur si besoin.
-    }
-  }
-
-  void _handleResponse(String userResponse) {
-    if (currentCard == null) return;
-    bool isCorrect = _responseService.evaluateResponse(userResponse, currentCard!.answer);
-    if (isCorrect) {
-      setState(() {
-        score += 10; // Ajout de points pour une bonne réponse.
-        userProgress = ((currentIndex + 1) / cards.length).clamp(0.0, 1.0);
-      });
-    } else {
-      // Aucune notification en cas de mauvaise réponse.
-    }
-    setState(() {
-      opponentProgress = ((currentIndex + 1) / cards.length).clamp(0.0, 1.0);
-    });
-    // Passer à la carte suivante après un délai.
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          currentIndex++;
-        });
-      }
-    });
-  }
-
+  // ─────────────────────────────   BUILD   ───────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // On simule un background cohérent avec la page de connexion (dégradé du rose vers le mauve).
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFAA88FF), Color(0xFF6655EE)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : currentCard == null
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Fin des cartes !',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Score final : $score',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
-            ),
-          ],
-        ),
-      )
-          : Stack(
-        children: [
-          // HUD en haut
-          Positioned(
-            top: 40,
-            left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                PlayerProgressBarWidget(
-                  progress: userProgress,
-                  avatarUrl: 'assets/images/user.png',
-                ),
-                const SizedBox(height: 16),
-                OpponentProgressBarWidget(
-                  progress: opponentProgress,
-                  avatarUrl: 'assets/images/opponent.png',
-                ),
-              ],
-            ),
-          ),
-          // Zone centrale : affichage de la carte avec animation
-          Center(
-            child: AnimatedCardDisplay(
-              cardKey: ValueKey(currentCard!.id),
-              child: Container(
-                key: ValueKey(currentCard!.id),
-                width: MediaQuery.of(context).size.width * 0.8,
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: currentCard!.type == 'definition'
-                    ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Nom de la carte en haut
-                    Text(
-                      currentCard!.name,
-                      style: Theme.of(context).textTheme.titleLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    // Explanation scrollable
-                    Container(
-                      height: 100,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          currentCard!.explanation.isNotEmpty
-                              ? currentCard!.explanation
-                              : "Pas d'explication disponible",
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-                    : // Cartes "complement" : mot-clé en haut
-                Text(
-                  currentCard!.name,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-          // Zone de réponse en bas
-          Positioned(
-            bottom: 40,
-            left: 16,
-            right: 16,
-            child: CardResponseWidget(
-              cardType: currentCard!.type,
-              options: currentCard!.type == 'definition'
-                  ? currentCard!.options
-                  : null,
-              onSubmit: _handleResponse,
-              questionText: currentCard!.type == 'complement'
-                  ? currentCard!.name
-                  : null,
-            ),
-          ),
-        ],
+    final p = context.watch<GameStateProvider>();
+
+    // ── post‑frame pour les contrôles temps‑réel
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _runEndOfGameChecks(p);
+      _handleOpponentConnectivity(p);
+    });
+
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        appBar: _buildAppBar(),
+        body: _buildBody(p),
       ),
     );
   }
+
+  // ─────────────────────────────  UI helpers  ────────────────────────────────
+  PreferredSizeWidget _buildAppBar() => AppBar(
+    title: Text('Game ${widget.game.id}'),
+    automaticallyImplyLeading: false,
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.flag),
+        tooltip: 'Abandonner',
+        onPressed: _confirmAbandon,
+      ),
+    ],
+  );
+
+  Widget _buildBody(GameStateProvider p) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(8),
+        child: Text('Temps écoulé : ${p.elapsedTime}s',
+            style: const TextStyle(fontSize: 18)),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: PlayerProgressBarWidget(
+                currentIndex: p.currentCardIndex,
+                totalCards  : p.totalCards,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OpponentProgressBarWidget(
+                currentIndex: p.opponentCardIndex,
+                totalCards  : p.totalCards,
+              ),
+            ),
+          ],
+        ),
+      ),
+      Expanded(child: AnimatedCardDisplay(cardModel: p.currentCard)),
+      CardResponseWidget(card: p.currentCard, onAnswer: p.submitResponse),
+    ],
+  );
+
+  // ────────────────────────────  GAME FLOW  ──────────────────────────────────
+  void _runEndOfGameChecks(GameStateProvider p) {
+    if (_hasFinished) return;
+
+    // L’adversaire vient de finir ou d’abandonner
+    if (p.opponentStatus == 'finished' || p.opponentStatus == 'abandon') {
+      _onGameFinished();
+      return;
+    }
+
+    // Le joueur local a fini en 1ᵉʳ → start waiting 60 s
+    final finishedLocal =
+        p.currentCardIndex >= p.totalCards && p.playerStatus != 'waitingOpponent';
+    if (finishedLocal && !_waitingTimerStarted) {
+      _waitingTimerStarted = true;
+      p.timerService.startWaitingTimer(_onGameFinished);
+      _showWaitingDialog();
+    }
+  }
+
+  // ───────────────────────────  CONNECTIVITY  ────────────────────────────────
+  void _handleOpponentConnectivity(GameStateProvider p) {
+    // ↘ déconnexion détectée
+    if (p.opponentJustDisconnected && !_disconnectWorkflowActive) {
+      _disconnectWorkflowActive = true;
+
+      _showBanner(DisconnectNotifWidget.disconnect());
+
+      // On démarre le timer de déconnexion
+      p.timerService.startDisconnectTimer(_onGameFinished);
+      _waitingTimerStarted = false;
+      p.timerService.stopWaitingTimer();
+    }
+    if (p.opponentJustReconnected && _disconnectWorkflowActive) {
+      _disconnectWorkflowActive = false;
+
+      _showBanner(DisconnectNotifWidget.reconnect());
+
+      // On stoppe le timer de déconnexion
+      p.timerService.stopDisconnectTimer();
+    }
+
+  }
+
+  // banner material
+  void _showBanner(Widget content) {
+    ScaffoldMessenger.of(context)
+      ..clearMaterialBanners()
+      ..showMaterialBanner(MaterialBanner(
+        content : content,
+        actions : [
+          TextButton(
+            onPressed: () =>
+                ScaffoldMessenger.of(context).clearMaterialBanners(),
+            child: const Text('OK'),
+          )
+        ],
+      ));
+  }
+
+  // ────────────────────────────  ABANDON  ────────────────────────────────────
+  Future<bool> _confirmAbandon() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder : (_) => AlertDialog(
+        title   : const Text('Quitter la partie ?'),
+        content : const Text('Voulez‑vous vraiment quitter la partie en cours ?'),
+        actions : [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text('Oui')),
+        ],
+      ),
+    ) ??
+        false;
+    if (!mounted) return false;
+    if (context.read<AbandonService>().isAbandonedByModal(confirm)) {
+      _hasFinished = true;
+      _finalizeMatch(isAbandon: true);
+      return true;
+    }
+    return false;
+  }
+
+  // ───────────────────────────── FIN PARTIE ──────────────────────────────────
+  void _onGameFinished() {
+    if (_hasFinished || !mounted) return;
+    _hasFinished = true;
+
+    final t = context.read<GameStateProvider>().timerService;
+    t.stopTimer();
+    t.stopWaitingTimer();
+    t.stopDisconnectTimer();
+
+    _finalizeMatch(isAbandon: false);
+  }
+
+  Future<void> _finalizeMatch({required bool isAbandon}) async {
+    final p       = context.read<GameStateProvider>();
+    final history = context.read<HistoryService>();
+
+    if (isAbandon) {
+      await p.gameFlowService.updatePlayerStatus(
+        p.gameFlowService.localPlayerId,
+        'abandon',
+      );
+    }
+
+    final ok = await p.gameFlowService.finalizeMatch(
+      localScore       : p.score,
+      opponentScore    : p.opponentScore,
+      localPlayerId    : p.gameFlowService.localPlayerId,
+      opponentPlayerId : p.gameFlowService.opponentPlayerId,
+      wasRanked        : false,
+      historyService   : history,
+      isAbandon        : isAbandon,
+    );
+
+    if (!mounted) return;
+    if (!ok) return Navigator.pop(context);
+
+    // récupère gameResult pour l’écran résultat
+    final snap = await RealtimeDBHelper
+        .ref('games/${widget.game.id}/players/${p.gameFlowService.localPlayerId}')
+        .child('gameResult')
+        .get();
+
+    final resultStr = snap.value as String?;
+    if (!mounted) return;
+    if (resultStr == null) return Navigator.pop(context);
+
+    // Si l’adversaire a abandonné, on le marque comme abandonné
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider.value(    value : p,                         // même GameStateProvider
+              child : ResultScreen(
+              playerWon    : resultStr == 'win',
+              playerScore  : p.score,
+              opponentScore: p.opponentScore,
+              wasRanked    : false,
+              opponentId   : p.gameFlowService.opponentPlayerId,
+            ),
+            ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────  DIALOG UE  ─────────────────────────────────
+  void  _showWaitingDialog() => showDialog(
+    barrierDismissible: false,
+    context: context,
+    builder: (_) => const AlertDialog(
+      title   : Text('En attente…'),
+      content : Text('Vous avez terminé vos cartes.\n'
+          'En attente de l’adversaire (60 s) …'),
+    ),
+  );
 }
