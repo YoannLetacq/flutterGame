@@ -1,44 +1,81 @@
+/* ---------- imports explicites ---------- */
+import java.util.Properties
+import java.io.FileInputStream
+/* ---------------------------------------- */
+
 plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
-    id "dev.flutter.flutter-gradle-plugin"
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'dev.flutter.flutter-gradle-plugin'
 }
 
+/* ---------- chargement des secrets ---------- */
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+/* -------------------------------------------- */
+
+def storeFilePath = keystoreProperties['storeFile']
+
+
 android {
-    namespace = "com.zone01.deck01.untitled"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-    }
+    namespace 'com.zone01.deck01'
+    compileSdk flutter.compileSdkVersion
+    ndkVersion  flutter.ndkVersion
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.zone01.deck01"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        applicationId 'com.zone01.deck01'  // idem Play Store
+        minSdk        23
+        targetSdk     flutter.targetSdkVersion
+        versionCode   flutter.versionCode
+        versionName   flutter.versionName
+    }
+
+    /* ---------- signature Release ---------- */
+    signingConfigs {
+        release {
+            if (!storeFilePath) {
+                throw new GradleException("La clé 'storeFile' est absente de key.properties")
+            }
+            def jksFile = rootProject.file(storeFilePath)
+            if (!jksFile.exists()) {
+                throw new GradleException("Keystore introuvable : ${jksFile}")
+            }
+
+            storeFile     jksFile
+            storePassword keystoreProperties['storePassword']
+            keyAlias      keystoreProperties['keyAlias']
+            keyPassword   keystoreProperties['keyPassword']
+        }
     }
 
     buildTypes {
+
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig     signingConfigs.release
+            minifyEnabled     true              // false pour debug
+            shrinkResources   true
+            proguardFiles     getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
+
+        debug {
+            signingConfig signingConfigs.release
+            debuggable true
         }
     }
-}
 
-flutter {
-    source = "../.."
+    /* ---------- Java 17 obligatoire avec AGP 8 ---------- */
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
+flutter { source '../..' }   // ne touchez pas
+apply plugin: 'com.google.gms.google-services'
+

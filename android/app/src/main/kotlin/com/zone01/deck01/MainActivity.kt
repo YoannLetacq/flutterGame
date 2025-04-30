@@ -1,4 +1,4 @@
-package com.zone01.deck01.untitled
+package com.zone01.deck01
 
 import io.flutter.embedding.android.FlutterActivity
 
