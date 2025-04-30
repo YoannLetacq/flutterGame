@@ -4,9 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Dépendance pour le plugin Android Gradle (vérifiez la version appropriée pour votre projet)
         classpath 'com.android.tools.build:gradle:7.4.2'
-        // Dépendance pour le plugin Google Services
         classpath 'com.google.gms:google-services:4.4.2'
     }
 }
@@ -31,4 +29,3 @@ tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
 
-apply plugin: 'com.google.gms.google-services'
