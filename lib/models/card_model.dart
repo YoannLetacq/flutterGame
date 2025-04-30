@@ -29,7 +29,7 @@ class CardModel {
           ? List<String>.from(json['options'])
           : (json['options'] is String ? [json['options'] as String] : []),
       type: json['type'] as String? ?? '',
-      explanation: json['explanation'] as String? ?? '',
+      explanation: json['explaination'] as String? ?? '',
       imageUrl: json['imageUrl'] as String? ?? '',
     );
   }
@@ -42,7 +42,7 @@ class CardModel {
       'answer': answer,
       'options': options,
       'type': type,
-      'explanation': explanation,
+      'explaination': explanation,
       'imageUrl': imageUrl,
     };
   }
