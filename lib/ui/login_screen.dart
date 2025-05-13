@@ -5,7 +5,7 @@ import '../../services/auth_service.dart';
 import 'home_screen.dart';
 
 /// Écran de connexion utilisateur.
-/// - Affiche un bouton de connexion Google et éventuellement des champs de connexion.
+/// - Affiche un bouton de connexion Google.
 /// - Après connexion réussie, redirige vers l'écran d'accueil.
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
