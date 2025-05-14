@@ -9,6 +9,7 @@ import '../services/abandon_service.dart';
 import '../services/elo_service.dart';
 import '../services/game_flow_service.dart';
 import '../services/game_progress_service.dart';
+import '../services/ranking_service.dart';
 import '../services/response_service.dart';
 import '../services/timer_service.dart';
 import '../ui/game_screen.dart';
@@ -20,6 +21,7 @@ void navigateToGame(BuildContext context, GameModel game) {
    // ① — instancie UN SEUL GameStateProvider
    final gameState = GameStateProvider(
      gameFlowService: GameFlowService(
+       rankingService: context.read<RankingService>(),
        timerService     : context.read<TimerService>(),
        progressService  : context.read<GameProgressService>(),
        abandonService   : context.read<AbandonService>(),
