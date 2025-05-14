@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:untitled/helpers/realtime_db_helper.dart';
+import 'package:untitled/services/ranking_service.dart';
 import 'package:untitled/services/timer_service.dart';
 import 'package:untitled/services/game_progress_service.dart';
 import 'package:untitled/services/abandon_service.dart';
 import 'package:untitled/services/elo_service.dart';
+import '../helpers/firestore_helper.dart';
 import '../models/game_model.dart';
 import 'history_service.dart';
 
@@ -14,6 +16,7 @@ class GameFlowService {
   final GameProgressService progressService;
   final AbandonService abandonService;
   final EloService eloService;
+  final RankingService rankingService;
 
   final GameModel game;
   final DatabaseReference gameRef;
@@ -21,9 +24,12 @@ class GameFlowService {
   late final String localPlayerId;
   late final String opponentPlayerId;
 
+  late final double elo;
+
   bool isGameEnded = false;
 
   GameFlowService({
+    required this.rankingService,
     required this.timerService,
     required this.progressService,
     required this.abandonService,
@@ -287,12 +293,25 @@ class GameFlowService {
           'gameResult'        : opponentResult,
         });
 
+
+        if (wasRanked) {
+         elo = rankingService.computeEloChange(
+            opponentRating: await FirestoreHelper.getField(collection: 'users', docId: opponentPlayerId, field: 'elo'),
+            playerRating: await FirestoreHelper.getField(collection: 'users', docId: localPlayerId, field: 'elo'),
+            score: localScore > opponentScore ? 1 : (localScore == opponentScore ? 0.5 : 0),
+            placementGamesPlayed: 5,
+            kInit: 200,
+            kStandard: 60,
+          );
+        }
         // 3)  Historique
         await historyService.recordGameHistory(localPlayerId, {
           'date'          : DateTime.now(),
           'score'         : localScore,
           'opponentScore' : opponentScore,
+          'opponentId'    : opponentPlayerId,
           'result'        : localResult,
+          'elo'           : elo,
           'mode'          : wasRanked ? 'ranked' : 'casual',
         });
 
