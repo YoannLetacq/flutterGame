@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:untitled/ui/profile_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_profile_service.dart';
 import '../providers/game_state_provider.dart';
@@ -91,10 +92,19 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (profile['avatarUrl']!.isNotEmpty)
-            CircleAvatar(
-              radius: 40,
-              backgroundImage: NetworkImage(profile['avatarUrl']!),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              child: CircleAvatar(
+                radius: 50,
+                backgroundImage: NetworkImage(profile['avatarUrl']),
+              ),
             ),
+
           const SizedBox(height: 10),
           Text(userName,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
