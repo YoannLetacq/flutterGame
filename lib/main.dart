@@ -1,11 +1,14 @@
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-// Tes imports de services
+// date
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+//  imports de services
 import 'package:untitled/providers/connectivity_provider.dart';
 import 'package:untitled/services/card_service.dart';
 import 'package:untitled/ui/widgets/kick_listener_widget.dart';
@@ -21,7 +24,7 @@ import 'services/game_progress_service.dart';
 import 'services/timer_service.dart';
 import 'services/user_profile_service.dart';
 
-// Ton écran racine
+//  écran racine
 import 'ui/login_screen.dart';
 import 'ui/home_screen.dart';
 import 'firebase_options.dart';
@@ -36,6 +39,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Charge les données de date pour le français
+  await initializeDateFormatting();
 
 
   runApp(
