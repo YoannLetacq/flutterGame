@@ -62,36 +62,7 @@ class _ResultScreenState extends State<ResultScreen>
     if (widget.wasRanked) {
       final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.currentUser;
-      if (user != null) {
-        final userId = user.uid;
-        final rankingService = Provider.of<RankingService>(context, listen: false);
-        final historyService = Provider.of<HistoryService>(context, listen: false);
 
-        // Dans la logique Elo, 1.0 = victoire, 0.0 = défaite
-        final playerEloScore = widget.playerWon ? 1.0 : 0.0;
-        final opponentEloScore = widget.playerWon ? 0.0 : 1.0;
-
-        // Met à jour le classement du joueur local + adversaire
-        rankingService.updateEloAfterGame(
-          playerId: userId,
-          opponentId: widget.opponentId,
-          playerScore: playerEloScore,
-          opponentScore: opponentEloScore,
-        );
-
-        // Enregistre l'historique de la partie pour le joueur local
-        historyService.recordGameHistory(userId, {
-          'date': DateTime.now(),
-          'score': widget.playerScore,
-          'opponentScore': widget.opponentScore,
-          'result': widget.playerWon ? 'win' : 'loss',
-          'mode': 'ranked',
-        });
-      } else {
-        if (kDebugMode) {
-          print("Aucun utilisateur connecté -> impossible de mettre à jour l'Elo.");
-        }
-      }
     }
   }
 
