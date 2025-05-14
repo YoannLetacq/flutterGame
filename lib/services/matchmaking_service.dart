@@ -53,8 +53,6 @@ class MatchmakingService with ChangeNotifier {
       }
     });
 
-
-
     if (!result.committed) {
       if (kDebugMode) print('[MatchmakingService] Transaction aborted');
       return;
@@ -71,7 +69,7 @@ class MatchmakingService with ChangeNotifier {
     }
   }
 
-  /// Ecoute pour Joueur 1
+  /// Ecoute les événements de création de partie
   void _listenForGame(String userId) {
     _gameListener = RealtimeDBHelper.ref('games').onChildAdded.listen((event) {
       final data = event.snapshot.value as Map?;
@@ -96,7 +94,8 @@ class MatchmakingService with ChangeNotifier {
     });
   }
 
-  /// Création de la partie (Joueur 2 uniquement)
+  /// Création de la partie associe le joueur 2 avec le joueur 1
+  /// instancie les modèles de jeu et de joueur
   Future<void> _createGame(String userId, String opponentId, GameMode mode) async {
     final unifinishedGame = await _hasUnfinishedGame(userId);
     // Si le joueur a déjà une partie en cours, block la possibilité de relancer

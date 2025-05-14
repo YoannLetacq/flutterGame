@@ -145,7 +145,7 @@ class _GameScreenState extends State<GameScreen> {
     if (p.opponentJustDisconnected && !_disconnectWorkflowActive) {
       _disconnectWorkflowActive = true;
 
-      _showBanner(DisconnectNotifWidget.disconnect());
+      DisconnectNotifWidget.disconnect();
 
       // On démarre le timer de déconnexion
       p.timerService.startDisconnectTimer(_onGameFinished);
@@ -155,28 +155,12 @@ class _GameScreenState extends State<GameScreen> {
     if (p.opponentJustReconnected && _disconnectWorkflowActive) {
       _disconnectWorkflowActive = false;
 
-      _showBanner(DisconnectNotifWidget.reconnect());
+      DisconnectNotifWidget.reconnect();
 
       // On stoppe le timer de déconnexion
       p.timerService.stopDisconnectTimer();
     }
 
-  }
-
-  // banner material
-  void _showBanner(Widget content) {
-    ScaffoldMessenger.of(context)
-      ..clearMaterialBanners()
-      ..showMaterialBanner(MaterialBanner(
-        content : content,
-        actions : [
-          TextButton(
-            onPressed: () =>
-                ScaffoldMessenger.of(context).clearMaterialBanners(),
-            child: const Text('OK'),
-          )
-        ],
-      ));
   }
 
   // ────────────────────────────  ABANDON  ────────────────────────────────────
