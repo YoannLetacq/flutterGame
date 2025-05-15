@@ -31,7 +31,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _hasForceEnd                 = false;
   bool _hasFinished                 = false;
 
-  bool _disconnectWorkflowActive    = false;      // nouveau
+  bool _disconnectWorkflowActive    = false;      
   // ────────────────────────────────────────────────────────────────────────────
 
   // ─────────────────────────────   INIT   ────────────────────────────────────
@@ -42,7 +42,7 @@ class _GameScreenState extends State<GameScreen> {
 
     provider.gameFlowService.startGame(
       onTick      : provider.updateElapsedTime,
-      onSpeedUp   : () => setState(() {}),            // simple refresh
+      onSpeedUp   : () => setState(() {}),            //  refresh
       onForcedEnd : () {
         if (!_hasForceEnd && mounted) {
           _hasForceEnd = true;
